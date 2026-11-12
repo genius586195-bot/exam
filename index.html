@@ -1310,11 +1310,20 @@ async function loadPublishedCatalog(){
     const items=Array.isArray(data.items)?data.items:[];
     if(!items.length){wrap.style.display='none';return;}
     const groups={};items.forEach(item=>{const subject=String(item.subject||'مواد أخرى');(groups[subject]||(groups[subject]=[])).push(item);});
-    list.innerHTML=Object.keys(groups).map(subject=>`<section class="portal-subject-group"><h3>${esc(subject)}</h3><div class="portal-exam-grid">${groups[subject].map(item=>`<article class="portal-exam-item"><div class="portal-exam-top"><span class="portal-exam-tag">${item.status==='waiting'?'يفتح لاحقًا':'متاح الآن'}</span><small>${Number(item.maxAttempts)>0?'حتى '+Number(item.maxAttempts)+' محاولات':'محاولات غير محدودة'}</small></div><b>${esc(item.title)}</b><small>${item.status==='waiting'?'موعد الفتح: '+formatCairoDate(Number(item.openAtMs)||0):item.closeAtMs?'آخر موعد: '+formatCairoDate(Number(item.closeAtMs)||0):'مفتوح دون موعد إغلاق'}</small><button onclick="enterPublishedExam(false,${JSON.stringify(String(item.code||''))})">دخول الاختبار</button></article>`).join('')}</div></section>`).join('');
+    list.innerHTML=Object.keys(groups).map(subject=>`<section class="portal-subject-group"><h3>${esc(subject)}</h3><div class="portal-exam-grid">${groups[subject].map(item=>`<article class="portal-exam-item"><div class="portal-exam-top"><span class="portal-exam-tag">${item.status==='waiting'?'يفتح لاحقًا':'متاح الآن'}</span><small>${Number(item.maxAttempts)>0?'حتى '+Number(item.maxAttempts)+' محاولات':'محاولات غير محدودة'}</small></div><b>${esc(item.title)}</b><small>${item.status==='waiting'?'موعد الفتح: '+formatCairoDate(Number(item.openAtMs)||0):item.closeAtMs?'آخر موعد: '+formatCairoDate(Number(item.closeAtMs)||0):'مفتوح دون موعد إغلاق'}</small><button type="button" class="portal-enter-exam" data-exam-code="${esc(String(item.code||''))}" onclick="enterCatalogExam(this)">دخول الاختبار</button></article>`).join('')}</div></section>`).join('');
   }catch(error){wrap.style.display='block';list.innerHTML=`<p class="mu">تعذر تحميل قائمة المواد الآن. يمكنك الدخول باستخدام الكود بالأسفل. (${esc(error.message||'خطأ اتصال')})</p>`;}
 }
-async function enterPublishedExam(silent,selectedCode=''){
-  const field=$('#portal-code'),error=$('#portal-error'),button=$('#portal-enter');const code=String(selectedCode||field?.value||PORTAL_ACCESS_CODE||'').trim().toUpperCase();if(!/^[A-Z0-9]{6,10}$/.test(code)){if(error){error.style.display='block';error.textContent='اكتب كود الدخول من 6 إلى 10 أحرف أو أرقام.';}return;}
+async function enterCatalogExam(button){
+  const code=String(button&&button.dataset?button.dataset.examCode||'':'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{6,10}$/.test(code)){
+    const list=$('#portal-catalog-list');
+    if(list)list.insertAdjacentHTML('afterbegin','<p class="portal-error">تعذر تحديد كود هذا الاختبار. حدّث الصفحة أو أبلغ مسؤول المنصة.</p>');
+    return;
+  }
+  return enterPublishedExam(false,code,button);
+}
+async function enterPublishedExam(silent,selectedCode='',triggerButton=null){
+  const field=$('#portal-code'),error=$('#portal-error'),button=triggerButton||$('#portal-enter');const code=String(selectedCode||field?.value||PORTAL_ACCESS_CODE||'').trim().toUpperCase();if(!/^[A-Z0-9]{6,10}$/.test(code)){if(error){error.style.display='block';error.textContent='اكتب كود الدخول من 6 إلى 10 أحرف أو أرقام.';}return;}
   PORTAL_ACCESS_CODE=code;if(field)field.value=code;ls.set('portal-pending-code',code);ls.set('portal-last-code',code);
   if(button&&!silent){button.disabled=true;button.textContent='جارٍ التحقق…';}if(error&&!silent){error.textContent='';error.style.display='none';}
   try{
