@@ -1469,10 +1469,17 @@ function makeRoomCode(){
   return out;
 }
 function readStudentIdentity(){
-  const n=$('#nm')?.value.trim()||(isAdminPreview()?'إدارة المنصة':st.name);
-  const sid=exam.askId?($('#sid')?.value.trim()||st.sid):'';
+  // Capture identity before opening a modal: the modal replaces #app and removes #nm/#sid.
+  const enteredName=String($('#nm')?.value||'').trim();
+  const enteredSid=String($('#sid')?.value||'').trim();
+  const n=enteredName||String(st.name||'').trim()||(isAdminPreview()?'إدارة المنصة':'');
+  const sid=exam.askId?(enteredSid||String(st.sid||'').trim()):'';
   if(!n){dlg('اكتب اسمك أولًا قبل إنشاء الغرفة أو الانضمام.');return null}
   if(exam.askId&&!sid){dlg('اكتب الرقم الجامعي أولًا.');return null}
+  // Keep the entered values in runtime state and local autosave so the next modal step
+  // (choosing duel/team size, password, or team) never asks the student again.
+  st.name=n;st.sid=sid;
+  if(typeof persist==='function')persist();
   return {name:n,sid};
 }
 function challengePost(payload){
