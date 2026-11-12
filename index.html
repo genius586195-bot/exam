@@ -377,6 +377,29 @@ const $=s=>document.querySelector(s), app=$('#app');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const LT=['أ','ب','ج','د','هـ','و','ز','ح'];
 const EXISTING_HOOK=String(PORTAL_BOOTSTRAP.hook||'https://script.google.com/macros/s/AKfycby6nKA98Agnc_AumCqvNEWIYIj7WmhrXJqsvn2VKdw4nsVzpRfabj0WFZW9-qHzCEQK/exec');
+// Cross-origin read helper for GitHub Pages <-> Apps Script. Google Apps Script ContentService supports JSONP.
+function gasGet(url, timeoutMs=18000){
+  return new Promise((resolve,reject)=>{
+    const callback='__examJsonp_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
+    const script=document.createElement('script');
+    let settled=false,timer=null;
+    const cleanup=()=>{
+      if(settled)return;
+      settled=true;
+      if(timer)clearTimeout(timer);
+      try{delete window[callback]}catch(e){window[callback]=undefined;}
+      if(script.parentNode)script.parentNode.removeChild(script);
+    };
+    window[callback]=(data)=>{if(settled)return;cleanup();resolve(data);};
+    script.async=true;
+    script.onerror=()=>{if(settled)return;cleanup();reject(new Error('تعذر الاتصال بخادم Apps Script. تأكد من نشر أحدث إصدار وأن صلاحية الوصول مضبوطة على Anyone.'));};
+    timer=setTimeout(()=>{if(settled)return;cleanup();reject(new Error('انتهت مهلة الاتصال بخادم الاختبارات. أعد المحاولة بعد التأكد من الإنترنت.'));},timeoutMs);
+    const separator=String(url).includes('?')?'&':'?';
+    script.src=String(url)+separator+'callback='+encodeURIComponent(callback)+'&_jsonp='+Date.now();
+    document.head.appendChild(script);
+  });
+}
+
 const EXISTING_KEY='';
 const SPREADSHEET_ID='1yN-Qa2STIXLwduAMU84KpV0R-7Tych6d4Yp1p0ejQ68';
 const DEF={title:'امتحان جديد',description:'',subject:'',total:'',time:0,shufQ:false,shufO:false,retake:true,askId:false,challengeEnabled:true,challengeId:'',libraryId:'',openAt:'',closeAt:'',maxAttempts:0,passScore:50,resultVisibility:'immediate',resultReleaseAt:'',answerVisibility:'afterSubmit',answerReleaseAt:'',showInCatalog:false,hook:EXISTING_HOOK,key:EXISTING_KEY,qs:[]};
@@ -1166,7 +1189,7 @@ async function loadRoomSettings(showToast){
   const state=$('#room-settings-state'),message=$('#room-settings-message');if(state)state.textContent='جارٍ تحميل الإعدادات…';
   try{
     const url=exam.hook+'?action=roomSettings&key='+encodeURIComponent(exam.key)+'&t='+Date.now();
-    const response=await fetch(url,{cache:'no-store'}),data=await response.json();if(!data.ok)throw new Error(data.error||'تعذر تحميل الإعدادات.');
+    const data=await gasGet(url);if(!data.ok)throw new Error(data.error||'تعذر تحميل الإعدادات.');
     roomSettings={enabled:!!data.enabled,mode:data.mode||'everyone',passwordSet:!!data.passwordSet,loaded:true};
     if($('#room-enabled'))$('#room-enabled').checked=roomSettings.enabled;
     if($('#room-mode'))$('#room-mode').value=roomSettings.mode;
@@ -1235,7 +1258,7 @@ async function testHook(){
   try{await fetch(exam.hook,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({exam:'__test__',name:'اختبار الاتصال',sid:'',score:0,total:0,pct:0,ok:0,bad:0,blank:0,secs:0,att:0})})}
   catch(x){e.textContent='✗ فشل الإرسال: لا يوجد اتصال أو الصفحة تمنع الطلبات الخارجية';return}
   await new Promise(r=>setTimeout(r,3000));
-  try{const r=await fetch(exam.hook+'?key='+encodeURIComponent(exam.key)+'&t='+Date.now());const j=await r.json();if(j.error)throw 0;
+  try{const j=await gasGet(exam.hook+'?key='+encodeURIComponent(exam.key)+'&t='+Date.now());if(j.error)throw 0;
     e.textContent=(j.rows||[]).some(x=>x.exam==='__test__')?'✓ الاتصال يعمل: تم الإرسال والقراءة':'✗ القراءة تعمل لكن الإرسال لم يصل. راجع Executions في Apps Script'}
   catch(x){e.textContent='✗ تعذر القراءة: تحقق من كلمة السر والنشر'}
 }
@@ -1267,7 +1290,7 @@ async function publishExam(){
   try{
     toast('جارٍ نشر الاختبار وحفظه مركزيًا…');
     await fetch(exam.hook,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'publishExam',adminKey:exam.key,accessCode:code,exam:payload,openAtMs,closeAtMs})});
-    let info=null;for(let i=0;i<8;i++){await new Promise(r=>setTimeout(r,500));try{const r=await fetch(exam.hook+'?action=publishedExamInfo&examId='+encodeURIComponent(exam.challengeId)+'&key='+encodeURIComponent(exam.key)+'&t='+Date.now(),{cache:'no-store'});info=await r.json();if(info&&info.ok&&info.code===code)break;}catch(e){}}
+    let info=null;for(let i=0;i<8;i++){await new Promise(r=>setTimeout(r,500));try{info=await gasGet(exam.hook+'?action=publishedExamInfo&examId='+encodeURIComponent(exam.challengeId)+'&key='+encodeURIComponent(exam.key)+'&t='+Date.now());if(info&&info.ok&&info.code===code)break;}catch(e){}}
     if(!info||!info.ok||info.code!==code)throw new Error(info?.error||'لم يصل تأكيد النشر من الخادم. راجع اتصال Apps Script وإصداره.');
     exam._accessCode=code;exam._publishedOpenAtMs=openAtMs;exam._publishedCloseAtMs=closeAtMs;exam._portalVerified=true;save();
     dl('بوابة-دخول-الطلاب.html',buildPortalSource(),'text/html');
@@ -1283,8 +1306,7 @@ function renderPortalGate(meta,errorText){
 async function loadPublishedCatalog(){
   const wrap=$('#portal-catalog-wrap'),list=$('#portal-catalog-list');if(!wrap||!list)return;
   try{
-    const response=await fetch(EXISTING_HOOK+'?action=publishedCatalog&t='+Date.now(),{cache:'no-store'});
-    const data=await response.json();if(!data?.ok)throw new Error(data?.error||'تعذر تحميل قائمة المواد.');
+    const data=await gasGet(EXISTING_HOOK+'?action=publishedCatalog&t='+Date.now());if(!data?.ok)throw new Error(data?.error||'تعذر تحميل قائمة المواد.');
     const items=Array.isArray(data.items)?data.items:[];
     if(!items.length){wrap.style.display='none';return;}
     const groups={};items.forEach(item=>{const subject=String(item.subject||'مواد أخرى');(groups[subject]||(groups[subject]=[])).push(item);});
@@ -1296,7 +1318,7 @@ async function enterPublishedExam(silent,selectedCode=''){
   PORTAL_ACCESS_CODE=code;if(field)field.value=code;ls.set('portal-pending-code',code);ls.set('portal-last-code',code);
   if(button&&!silent){button.disabled=true;button.textContent='جارٍ التحقق…';}if(error&&!silent){error.textContent='';error.style.display='none';}
   try{
-    const r=await fetch(EXISTING_HOOK+'?action=publishedExam&code='+encodeURIComponent(code)+'&t='+Date.now(),{cache:'no-store'}),data=await r.json();
+    const data=await gasGet(EXISTING_HOOK+'?action=publishedExam&code='+encodeURIComponent(code)+'&t='+Date.now());
     if(!data||!data.ok)throw new Error(data?.error||'تعذر العثور على اختبار بهذا الكود.');
     if(!data.available){renderPortalGate(data,data.status==='closed'?'انتهى موعد هذا الاختبار.':'');
       if(data.status==='waiting'){clearInterval(window.portalGateTimer);window.portalGateTimer=setInterval(()=>enterPublishedExam(true),15000);}else clearInterval(window.portalGateTimer);
@@ -1326,7 +1348,7 @@ function studentPortal(){
 }
 async function refreshPortalExam(){
   if(!PORTAL_MODE||!DATA||!exam._accessCode)return;
-  try{const r=await fetch(EXISTING_HOOK+'?action=publishedExam&code='+encodeURIComponent(exam._accessCode)+'&t='+Date.now(),{cache:'no-store'});const data=await r.json();
+  try{const data=await gasGet(EXISTING_HOOK+'?action=publishedExam&code='+encodeURIComponent(exam._accessCode)+'&t='+Date.now());
     if(!data?.ok||!data.available){if(!st.started&&!st.done){exam._portalVerified=false;exam._portalError=data?.message||'كود الاختبار لم يعد صالحًا.';refreshExamAvailability();}return;}
     exam._serverTimeOffsetMs=(Number(data.serverNow)||Date.now())-Date.now();exam._publishedOpenAtMs=Number(data.openAtMs)||0;exam._publishedCloseAtMs=Number(data.closeAtMs)||0;exam._portalVerified=true;
     if(!st.started&&!st.done){const latest=data.exam;latest.hook=EXISTING_HOOK;latest.key='';latest._accessCode=exam._accessCode;latest._serverTimeOffsetMs=exam._serverTimeOffsetMs;latest._publishedOpenAtMs=exam._publishedOpenAtMs;latest._publishedCloseAtMs=exam._publishedCloseAtMs;latest._portalVerified=true;DATA=latest;exam=Object.assign({},DEF,latest);AK=studentAttemptKey(DATA);ROOM_STATE_KEY='active-challenge:'+AK;student();}
@@ -1350,7 +1372,7 @@ async function loadRes(){
   const box=$('#rs');
   if(!exam.hook||!exam.key){box.innerHTML='<div class="c">لعرض النتائج اربط الموقع بجدول Google Sheets وأدخل كلمة السر من تبويب «الإعدادات».</div>';return}
   box.innerHTML='<div class="c">جارٍ تحميل النتائج…</div>';
-  try{const r=await fetch(exam.hook+(exam.hook.includes('?')?'&':'?')+'key='+encodeURIComponent(exam.key)+'&t='+Date.now());const j=await r.json();if(j.error)throw 0;showRes(j.rows||[],j.attempts||[],j.questionAnalytics||[],j.comparison||[],j.subjectRanking||[])}
+  try{const j=await gasGet(exam.hook+(exam.hook.includes('?')?'&':'?')+'key='+encodeURIComponent(exam.key)+'&t='+Date.now());if(j.error)throw 0;showRes(j.rows||[],j.attempts||[],j.questionAnalytics||[],j.comparison||[],j.subjectRanking||[])}
   catch(e){box.innerHTML='<div class="c">تعذر تحميل النتائج. تأكد من الرابط وكلمة السر ومن أن خيار الوصول Anyone. <br><br><button onclick="loadRes()">إعادة المحاولة</button></div>'}
 }
 function showRes(rows,attempts=[],questionAnalytics=[],comparison=[],subjectRanking=[]){
@@ -1387,8 +1409,7 @@ function csv(){
 /* ---------- غرف التحدي عبر Google Sheets / Apps Script ---------- */
 async function loadPublicRoomPolicy(){
   try{
-    const response=await fetch(exam.hook+'?action=roomPolicy&t='+Date.now(),{cache:'no-store'});
-    const data=await response.json();if(data&&data.ok){publicRoomPolicy={enabled:!!data.enabled,mode:data.mode||'everyone',loaded:true};if(DATA&&!st.started&&!st.challenge)student();}
+    const data=await gasGet(exam.hook+'?action=roomPolicy&t='+Date.now());if(data&&data.ok){publicRoomPolicy={enabled:!!data.enabled,mode:data.mode||'everyone',loaded:true};if(DATA&&!st.started&&!st.challenge)student();}
   }catch(e){}
   return publicRoomPolicy;
 }
@@ -1407,14 +1428,14 @@ function examOpenNow(){
 function randomAttemptId(){return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():('att-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,14));}
 async function getAttemptStatus(attemptId){
   const url=exam.hook+'?action=attemptStatus&attemptId='+encodeURIComponent(attemptId)+'&t='+Date.now();
-  const r=await fetch(url,{cache:'no-store'});return r.json();
+  return gasGet(url);
 }
 async function registerExamAttempt(identity,gradingMode){
   const windowCheck=examOpenNow();if(!windowCheck.ok)throw new Error(windowCheck.message);
   const examId=String(exam.challengeId||exam.libraryId||'');
   const openAtMs=examOpenMs(),closeAtMs=examCloseMs();
   const eligibilityUrl=exam.hook+'?action=attemptEligibility&examId='+encodeURIComponent(examId)+'&exam='+encodeURIComponent(exam.title)+'&name='+encodeURIComponent(identity.name)+'&sid='+encodeURIComponent(identity.sid||'')+'&maxAttempts='+encodeURIComponent(Number(exam.maxAttempts)||0)+'&openAtMs='+openAtMs+'&closeAtMs='+closeAtMs+'&accessCode='+encodeURIComponent(exam._accessCode||'')+'&t='+Date.now();
-  const eligibility=await (await fetch(eligibilityUrl,{cache:'no-store'})).json();
+  const eligibility=await gasGet(eligibilityUrl);
   if(!eligibility.allowed)throw new Error(eligibility.message||'لا يمكنك بدء محاولة جديدة.');
   const attemptId=randomAttemptId();
   await fetch(exam.hook,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'startAttempt',attemptId,examId,accessCode:exam._accessCode||'',exam:exam.title,name:identity.name,sid:identity.sid||'',maxAttempts:Number(exam.maxAttempts)||0,openAtMs,closeAtMs,gradingMode,passScore:Number(exam.passScore??50),subject:exam.subject||''})});
@@ -1449,8 +1470,7 @@ function challengePost(payload){
 }
 async function challengeGet(code){
   const url=exam.hook+(exam.hook.includes('?')?'&':'?')+'action=room&code='+encodeURIComponent(code)+'&t='+Date.now();
-  const response=await fetch(url,{method:'GET',cache:'no-store'});
-  return response.json();
+  return gasGet(url);
 }
 function challengeModal(content){const m=$('#md');m.innerHTML=`<div class="mb challenge-modal">${content}</div>`;m.classList.add('on')}
 function closeChallengeModal(){ $('#md').classList.remove('on'); }
