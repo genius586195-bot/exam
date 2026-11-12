@@ -1,0 +1,573 @@
+const KEY='12345678M';
+const SPREADSHEET_ID='1yN-Qa2STIXLwduAMU84KpV0R-7Tych6d4Yp1p0ejQ68';
+const SN='النتائج';
+const ROOM_SHEET='غرف التحدي';
+const PLAYER_SHEET='مشاركو التحدي';
+const ROOM_SETTINGS_SHEET='إعدادات الغرف';
+const ATTEMPT_SHEET='سجل محاولات الامتحان';
+const QUESTION_SHEET='تحليل الأسئلة';
+const PUBLISHED_EXAM_SHEET='الاختبارات المنشورة';
+const PUBLISHED_EXAM_HEADERS=['معرّف الاختبار','كود الدخول','عنوان الاختبار','المادة','حالة النشر','موعد الفتح (ms)','موعد الإغلاق (ms)','أقصى المحاولات','وقت النشر','آخر تحديث','رقم الجزء','عدد الأجزاء','جزء بيانات الاختبار','إظهار في قائمة المواد'];
+const ATTEMPT_HEADERS=['معرّف المحاولة','معرّف الاختبار','الامتحان','مفتاح الطالب','اسم الطالب','الرقم الجامعي','الحالة','وقت البدء','وقت التسليم','الدرجة','من','النسبة','رقم المحاولة','نمط التصحيح','درجة النجاح المطلوبة','المادة / المقرر'];
+const QUESTION_HEADERS=['معرّف الاختبار','الامتحان','رقم السؤال','نص السؤال','عدد المحاولات','صحيحة','خاطئة','بدون إجابة','دقة الإجابة %'];
+const H=['التاريخ والوقت','الامتحان','اسم الطالب','الرقم الجامعي','الدرجة','من','النسبة %','صحيحة','خاطئة','بدون إجابة','الزمن (ثانية)','رقم المحاولة'];
+const K=['t','exam','name','sid','score','total','pct','ok','bad','blank','secs','att'];
+const ROOM_HEADERS=['كود الغرفة','الامتحان','النظام','الحالة','عدد اللاعبين','معرّف المضيف','تاريخ الإنشاء','وقت البدء','تاريخ الانتهاء','الدرجة الكلية','معرّف نسخة الامتحان','عدد أعضاء كل فريق','موعد فتح الاختبار','موعد غلق الاختبار'];
+const PLAYER_HEADERS=['كود الغرفة','معرّف اللاعب','اسم اللاعب','الفريق','وقت الانضمام','الحالة','الدرجة','من','النسبة','الزمن بالثواني','وقت التسليم'];
+
+function json_(value){
+  return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
+}
+function getSpreadsheet_(){ return SpreadsheetApp.openById(SPREADSHEET_ID); }
+function getRes(){
+  const sheet=getSpreadsheet_().getSheetByName(SN);
+  if(!sheet) throw new Error('لم يتم العثور على تبويب النتائج. لم يتم تعديل أي ورقة.');
+  const headers=sheet.getRange(1,1,1,H.length).getDisplayValues()[0];
+  if(headers.some((value,i)=>String(value).trim()!==H[i]))
+    throw new Error('عناوين أعمدة تبويب النتائج غير مطابقة. لم يتم تسجيل أي بيانات.');
+  return sheet;
+}
+function getChallengeSheets_(){
+  const ss=getSpreadsheet_();
+  let rooms=ss.getSheetByName(ROOM_SHEET);
+  if(!rooms){ rooms=ss.insertSheet(ROOM_SHEET); rooms.getRange(1,1,1,ROOM_HEADERS.length).setValues([ROOM_HEADERS]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff'); rooms.setFrozenRows(1); }
+  else {
+    // ترقية آمنة: إضافة عمود معرّف نسخة الامتحان دون مسح الغرف القديمة أو تعديل بياناتها.
+    const firstTen=rooms.getRange(1,1,1,10).getDisplayValues()[0];
+    const expected=ROOM_HEADERS.slice(0,10);
+    if(firstTen.some((v,i)=>String(v).trim()!==expected[i])) throw new Error('عناوين تبويب غرف التحدي غير مطابقة. لم يتم تعديل البيانات.');
+    if(String(rooms.getRange(1,11).getDisplayValues()[0][0]).trim()!==ROOM_HEADERS[10]) {
+      rooms.getRange(1,11).setValue(ROOM_HEADERS[10]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+    }
+    if(String(rooms.getRange(1,12).getDisplayValues()[0][0]).trim()!==ROOM_HEADERS[11]) {
+      rooms.getRange(1,12).setValue(ROOM_HEADERS[11]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+    }
+    if(String(rooms.getRange(1,13).getDisplayValues()[0][0]).trim()!==ROOM_HEADERS[12]) {
+      rooms.getRange(1,13).setValue(ROOM_HEADERS[12]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+    }
+    if(String(rooms.getRange(1,14).getDisplayValues()[0][0]).trim()!==ROOM_HEADERS[13]) {
+      rooms.getRange(1,14).setValue(ROOM_HEADERS[13]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+    }
+  }
+  let players=ss.getSheetByName(PLAYER_SHEET);
+  if(!players){ players=ss.insertSheet(PLAYER_SHEET); players.getRange(1,1,1,PLAYER_HEADERS.length).setValues([PLAYER_HEADERS]).setFontWeight('bold').setBackground('#0f766e').setFontColor('#ffffff'); players.setFrozenRows(1); }
+  return {rooms,players};
+}
+function clean_(v,max){ return String(v==null?'':v).trim().slice(0,max||120); }
+function normalizePassScore_(value){ if(value===null||value===undefined||value==='') return 50; const n=Number(value); return Number.isFinite(n)?Math.max(0,Math.min(100,n)):50; }
+function normalizeExam_(v){ return clean_(String(v==null?'':v),160).normalize('NFC').replace(/[\u200B-\u200D\uFEFF]/g,'').replace(/\s+/g,' ').trim(); }
+function findRoomRow_(sheet,code){
+  const last=sheet.getLastRow(); if(last<2) return 0;
+  const found=sheet.getRange(2,1,last-1,1).createTextFinder(code).matchEntireCell(true).findNext();
+  return found?found.getRow():0;
+}
+function readRoom_(sheets,code){
+  const row=findRoomRow_(sheets.rooms,code); if(!row) return null;
+  const v=sheets.rooms.getRange(row,1,1,ROOM_HEADERS.length).getValues()[0];
+  const mode=String(v[2]);
+  return {row,code:String(v[0]),exam:String(v[1]),mode,status:String(v[3]),maxPlayers:Number(v[4]),hostId:String(v[5]),createdAt:v[6],startedAt:v[7],expiresAt:v[8],total:Number(v[9]),examId:String(v[10]||''),teamSize:Number(v[11])||(mode==='teams'?2:1),openAtMs:Number(v[12])||0,closeAtMs:Number(v[13])||0};
+}
+function readPlayers_(sheet,code){
+  const last=sheet.getLastRow(); if(last<2) return [];
+  return sheet.getRange(2,1,last-1,PLAYER_HEADERS.length).getValues()
+    .filter(r=>String(r[0])===code)
+    .map((r)=>({row:0,code:String(r[0]),playerId:String(r[1]),name:String(r[2]),team:String(r[3]),joinedAt:r[4],status:String(r[5]),score:r[6],total:r[7],pct:r[8],seconds:r[9],submittedAt:r[10]}));
+}
+function findPlayerRow_(sheet,code,playerId){
+  const last=sheet.getLastRow(); if(last<2) return 0;
+  const values=sheet.getRange(2,1,last-1,2).getValues();
+  for(let i=0;i<values.length;i++) if(String(values[i][0])===code && String(values[i][1])===playerId) return i+2;
+  return 0;
+}
+function getKeyValueSheet_(name, headers){
+  const ss=getSpreadsheet_(); let sheet=ss.getSheetByName(name);
+  if(!sheet){sheet=ss.insertSheet(name);sheet.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');sheet.setFrozenRows(1);}
+  return sheet;
+}
+function getRoomSettings_(create){
+  const ss=getSpreadsheet_(); let sheet=ss.getSheetByName(ROOM_SETTINGS_SHEET);
+  if(!sheet && create) sheet=getKeyValueSheet_(ROOM_SETTINGS_SHEET,['الإعداد','القيمة','آخر تحديث']);
+  const defaults={enabled:true,mode:'everyone',passwordHash:'',updatedAt:''};
+  if(!sheet) return defaults;
+  const values=sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,2).getValues():[];
+  values.forEach(row=>{
+    const k=String(row[0]||'').trim(),v=row[1];
+    if(k==='enabled') defaults.enabled=String(v).toLowerCase()!=='false';
+    if(k==='mode' && ['everyone','admin','password'].includes(String(v))) defaults.mode=String(v);
+    if(k==='passwordHash') defaults.passwordHash=String(v||'');
+    if(k==='updatedAt') defaults.updatedAt=v;
+  });
+  return defaults;
+}
+function writeRoomSettings_(d){
+  if(clean_(d.adminKey,120)!==KEY) throw new Error('غير مصرح لك بتعديل إعدادات الغرف.');
+  const sheet=getKeyValueSheet_(ROOM_SETTINGS_SHEET,['الإعداد','القيمة','آخر تحديث']);
+  const old=getRoomSettings_(true), enabled=d.enabled===true || String(d.enabled)==='true';
+  const mode=['everyone','admin','password'].includes(String(d.mode))?String(d.mode):'everyone';
+  let passwordHash=old.passwordHash;
+  const password=String(d.password||'').trim();
+  if(mode==='password' && password){
+    if(password.length<6) throw new Error('كلمة مرور إنشاء الغرف يجب ألا تقل عن 6 أحرف.');
+    const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,'ROOM-V8:'+password,Utilities.Charset.UTF_8);
+    passwordHash=Utilities.base64Encode(digest);
+  }
+  if(mode==='password' && !passwordHash) throw new Error('أدخل كلمة مرور قبل تفعيل وضع كلمة المرور.');
+  const map={enabled:String(enabled),mode,passwordHash,updatedAt:new Date()};
+  const rows=sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,3).getValues():[];
+  const existing={}; rows.forEach((r,i)=>existing[String(r[0])]=i+2);
+  Object.keys(map).forEach(k=>{
+    const row=[k,map[k],new Date()];
+    if(existing[k]) sheet.getRange(existing[k],1,1,3).setValues([row]); else sheet.appendRow(row);
+  });
+  SpreadsheetApp.flush();
+  const result=getRoomSettings_(false);
+  return {ok:true,enabled:result.enabled,mode:result.mode,passwordSet:!!result.passwordHash,updatedAt:result.updatedAt};
+}
+function roomPasswordMatches_(plain, expectedHash){
+  if(!expectedHash) return false;
+  const digest=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,'ROOM-V8:'+String(plain||''),Utilities.Charset.UTF_8);
+  return Utilities.base64Encode(digest)===expectedHash;
+}
+function getAttemptSheet_(){
+  const sheet=getKeyValueSheet_(ATTEMPT_SHEET,ATTEMPT_HEADERS);
+  // إضافة عمود المادة للنسخ السابقة من V8 دون لمس السجلات الموجودة.
+  if(!String(sheet.getRange(1,16).getDisplayValue()||'').trim()){
+    sheet.getRange(1,16).setValue('المادة / المقرر').setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+  }
+  return sheet;
+}
+function getQuestionSheet_(){
+  return getKeyValueSheet_(QUESTION_SHEET,QUESTION_HEADERS);
+}
+function findAttemptRow_(sheet,attemptId){
+  const last=sheet.getLastRow(); if(last<2)return 0;
+  const found=sheet.getRange(2,1,last-1,1).createTextFinder(String(attemptId)).matchEntireCell(true).findNext();
+  return found?found.getRow():0;
+}
+function getPublishedExamSheet_(){
+  const ss=getSpreadsheet_();let sheet=ss.getSheetByName(PUBLISHED_EXAM_SHEET);
+  if(!sheet){sheet=ss.insertSheet(PUBLISHED_EXAM_SHEET);sheet.getRange(1,1,1,PUBLISHED_EXAM_HEADERS.length).setValues([PUBLISHED_EXAM_HEADERS]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');sheet.setFrozenRows(1);}
+  else {
+    // V10 adds one optional catalog flag without changing any published exam rows.
+    const legacyHeaders=sheet.getRange(1,1,1,13).getDisplayValues()[0];
+    const expectedLegacy=PUBLISHED_EXAM_HEADERS.slice(0,13);
+    if(legacyHeaders.some((v,i)=>String(v).trim()!==expectedLegacy[i])) throw new Error('عناوين تبويب الاختبارات المنشورة غير مطابقة. لم يتم تعديل البيانات.');
+    const catalogHeader=String(sheet.getRange(1,14).getDisplayValue()||'').trim();
+    if(!catalogHeader) sheet.getRange(1,14).setValue(PUBLISHED_EXAM_HEADERS[13]).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+    else if(catalogHeader!==PUBLISHED_EXAM_HEADERS[13]) throw new Error('عنوان عمود قائمة المواد غير مطابق. لم يتم تعديل البيانات.');
+  }
+  return sheet;
+}
+function publishedRows_(){
+  const sheet=getPublishedExamSheet_(),last=sheet.getLastRow();
+  return {sheet,rows:last>1?sheet.getRange(2,1,last-1,PUBLISHED_EXAM_HEADERS.length).getValues():[]};
+}
+function getPublishedExamMetaById_(examId){
+  const id=clean_(examId,120);if(!id)return null;
+  const data=publishedRows_();
+  for(let i=0;i<data.rows.length;i++)if(String(data.rows[i][0])===id){
+    const r=data.rows[i];return {examId:String(r[0]),code:String(r[1]),title:String(r[2]),subject:String(r[3]||''),status:String(r[4]),openAtMs:Number(r[5])||0,closeAtMs:Number(r[6])||0,maxAttempts:Math.max(0,Number(r[7])||0),publishedAt:r[8],updatedAt:r[9],parts:Number(r[11])||1,showInCatalog:r[13]===true||String(r[13]).toLowerCase()==='true'};
+  }
+  return null;
+}
+function publishExam_(d){
+  if(clean_(d.adminKey,120)!==KEY)throw new Error('غير مصرح بنشر الاختبار.');
+  const exam=d.exam&&typeof d.exam==='object'?JSON.parse(JSON.stringify(d.exam)):null;
+  if(!exam||!Array.isArray(exam.qs)||!exam.qs.length)throw new Error('بيانات الاختبار غير مكتملة أو لا تحتوي على أسئلة.');
+  const examId=clean_(exam.challengeId||exam.libraryId||d.examId,120);
+  if(!examId)throw new Error('معرّف الاختبار غير موجود. احفظ الاختبار ثم أعد النشر.');
+  const code=clean_(d.accessCode,12).toUpperCase();
+  if(!/^[A-Z0-9]{6,10}$/.test(code))throw new Error('كود الدخول يجب أن يكون من 6 إلى 10 أحرف أو أرقام.');
+  const openAtMs=Math.max(0,Number(d.openAtMs)||0),closeAtMs=Math.max(0,Number(d.closeAtMs)||0);
+  if(openAtMs&&closeAtMs&&closeAtMs<=openAtMs)throw new Error('موعد الإغلاق يجب أن يكون بعد موعد الفتح.');
+  const data=publishedRows_(),existingCode=data.rows.find(r=>String(r[1]).toUpperCase()===code&&String(r[0])!==examId);
+  if(existingCode)throw new Error('كود الدخول مستخدم لاختبار آخر. أعد المحاولة لإنشاء كود جديد.');
+  const previous=data.rows.filter(r=>String(r[0])===examId);
+  const previousRows=[];data.rows.forEach((r,i)=>{if(String(r[0])===examId)previousRows.push(i+2);});
+  // The whole exam JSON is stored in safe-size chunks to stay below Google Sheets cell limits.
+  exam.key='';
+  exam._publishedOpenAtMs=openAtMs;exam._publishedCloseAtMs=closeAtMs;
+  const scriptUrl=ScriptApp.getService().getUrl();if(scriptUrl)exam.hook=scriptUrl;
+  const payload=JSON.stringify(exam),chunkSize=40000,parts=[];
+  // Keep UTF-16 surrogate pairs together so emoji and uncommon characters survive chunking.
+  for(let i=0;i<payload.length;){
+    let end=Math.min(i+chunkSize,payload.length);
+    if(end<payload.length){const last=payload.charCodeAt(end-1);if(last>=0xD800&&last<=0xDBFF)end--;}
+    parts.push(payload.slice(i,end));i=end;
+  }
+  if(!parts.length)parts.push('{}');
+  // Remove only the previous publication for this exam; all other exams and sheets remain intact.
+  previousRows.sort((a,b)=>b-a).forEach(row=>data.sheet.deleteRow(row));
+  const now=new Date(),title=clean_(exam.title,160),subject=clean_(exam.subject,120),maxAttempts=Math.max(0,Number(exam.maxAttempts)||0);
+  const showInCatalog=exam.showInCatalog===true||String(exam.showInCatalog).toLowerCase()==='true';
+  const values=parts.map((part,i)=>[examId,code,title,subject,'published',openAtMs,closeAtMs,maxAttempts,now,now,i+1,parts.length,part,showInCatalog]);
+  data.sheet.getRange(data.sheet.getLastRow()+1,1,values.length,PUBLISHED_EXAM_HEADERS.length).setValues(values);
+  SpreadsheetApp.flush();
+  return {ok:true,examId,code,title,parts:parts.length,serverNow:Date.now(),openAtMs,closeAtMs};
+}
+function getPublishedExamByCode_(code){
+  const accessCode=clean_(code,12).toUpperCase();if(!/^[A-Z0-9]{6,10}$/.test(accessCode))return {ok:false,error:'كود الدخول غير صالح. تأكد من كتابته بشكل صحيح.'};
+  const data=publishedRows_(),matched=data.rows.filter(r=>String(r[1]).toUpperCase()===accessCode&&String(r[4])==='published');
+  if(!matched.length)return {ok:false,error:'لم يتم العثور على اختبار منشور بهذا الكود. راجع الكود مع المدرّس.'};
+  const meta=matched[0],examId=String(meta[0]),openAtMs=Number(meta[5])||0,closeAtMs=Number(meta[6])||0,serverNow=Date.now();
+  const publicMeta={examId,code:accessCode,title:String(meta[2]),subject:String(meta[3]||''),openAtMs,closeAtMs,maxAttempts:Number(meta[7])||0,serverNow,updatedAt:meta[9]};
+  if(openAtMs&&serverNow<openAtMs)return Object.assign({ok:true,available:false,status:'waiting',message:'الاختبار لم يُفتح بعد. ستظهر الأسئلة تلقائيًا عند موعد الفتح.'},publicMeta);
+  const isClosed=!!(closeAtMs&&serverNow>=closeAtMs);
+  const parts=matched.slice().sort((a,b)=>(Number(a[10])||0)-(Number(b[10])||0));
+  const expected=Number(meta[11])||1;if(parts.length!==expected)return {ok:false,error:'بيانات الاختبار المنشور غير مكتملة. أبلغ مسؤول المنصة.'};
+  let exam;try{exam=JSON.parse(parts.map(r=>String(r[12]||'')).join(''));}catch(e){return {ok:false,error:'تعذر قراءة بيانات الاختبار المنشور.'};}
+  exam.key='';exam.hook=ScriptApp.getService().getUrl()||exam.hook||'';exam._accessCode=accessCode;exam._portalClosed=isClosed;
+  exam._publishedExamId=examId;exam._publishedOpenAtMs=openAtMs;exam._publishedCloseAtMs=closeAtMs;
+  return Object.assign({ok:true,available:true,status:isClosed?'closed':'open',message:isClosed?'انتهى موعد الاختبار وتم إغلاق استقبال المحاولات.':'',exam},publicMeta);
+}
+function publishedCatalog_(){
+  const data=publishedRows_(),now=Date.now(),seen={};
+  const items=[];
+  data.rows.forEach(r=>{
+    const examId=String(r[0]||''),code=String(r[1]||'').toUpperCase();
+    if(!examId||!code||seen[examId]||String(r[4])!=='published')return;
+    seen[examId]=true;
+    const visible=r[13]===true||String(r[13]).toLowerCase()==='true';
+    if(!visible)return;
+    const openAtMs=Number(r[5])||0,closeAtMs=Number(r[6])||0;
+    if(closeAtMs&&now>=closeAtMs)return;
+    items.push({examId,code,title:String(r[2]||'اختبار'),subject:String(r[3]||'مواد أخرى'),openAtMs,closeAtMs,status:openAtMs&&now<openAtMs?'waiting':'open',maxAttempts:Math.max(0,Number(r[7])||0)});
+  });
+  items.sort((a,b)=>a.subject.localeCompare(b.subject,'ar')||a.title.localeCompare(b.title,'ar'));
+  return {ok:true,items,serverNow:now};
+}
+function publishedExamInfo_(examId){
+  const meta=getPublishedExamMetaById_(examId);if(!meta)return {ok:false,error:'لم يتم نشر هذا الاختبار بعد.'};
+  return {ok:true,examId:meta.examId,code:meta.code,title:meta.title,subject:meta.subject,status:meta.status,openAtMs:meta.openAtMs,closeAtMs:meta.closeAtMs,maxAttempts:meta.maxAttempts,updatedAt:meta.updatedAt,serverNow:Date.now()};
+}
+function studentIdentityKey_(name,sid){
+  const id=clean_(sid,100).normalize('NFC').replace(/\s+/g,'').toLowerCase();
+  if(id)return 'sid:'+id;
+  return 'name:'+normalizeExam_(name).toLowerCase();
+}
+function checkAttemptEligibility_(d){
+  const examId=clean_(d.examId,120),name=clean_(d.name,100),sid=clean_(d.sid,100);
+  if(!examId||!name) throw new Error('بيانات الطالب أو الاختبار غير مكتملة.');
+  const published=getPublishedExamMetaById_(examId);
+  if(published&&clean_(d.accessCode,12).toUpperCase()!==published.code)return {allowed:false,message:'كود الدخول لم يعد صالحًا لهذا الاختبار. استخدم أحدث كود أرسله المدرّس.',attemptsUsed:0};
+  const now=Date.now(),open=published?published.openAtMs:(Number(d.openAtMs)||0),close=published?published.closeAtMs:(Number(d.closeAtMs)||0);
+  if(open && now<open) return {allowed:false,message:'لم يحن موعد فتح الاختبار بعد. يبدأ الاختبار في الموعد المحدد بتوقيت القاهرة.',attemptsUsed:0,openAtMs:open,serverNow:now};
+  if(close && now>=close) return {allowed:false,message:'انتهى موعد إغلاق الاختبار. لم يعد استقبال محاولات جديدة متاحًا.',attemptsUsed:0,closeAtMs:close,serverNow:now};
+  const max=published?published.maxAttempts:Math.max(0,Number(d.maxAttempts)||0),identity=studentIdentityKey_(name,sid),sheet=getAttemptSheet_();
+  const data=sheet.getLastRow()>1?sheet.getRange(2,1,sheet.getLastRow()-1,ATTEMPT_HEADERS.length).getValues():[];
+  const matching=data.filter(r=>String(r[1])===examId && String(r[3])===identity && ['started','submitted'].includes(String(r[6])));
+  // Include historical V7 submissions that have no unique attempt ID yet, without double-counting V8 records.
+  const results=getRes(), last=results.getLastRow();
+  let legacyCount=0;
+  if(last>1){
+    const oldRows=results.getRange(2,1,last-1,14).getValues();
+    legacyCount=oldRows.filter(r=>!String(r[12]||'') && normalizeExam_(r[1])===normalizeExam_(published?published.title:d.exam) && studentIdentityKey_(r[2],r[3])===identity).length;
+  }
+  const used=matching.length+legacyCount;
+  return {allowed:!max||used<max,message:max&&used>=max?'وصلت إلى الحد الأقصى لعدد المحاولات لهذا الاختبار.':'مسموح ببدء المحاولة.',attemptsUsed:used,maxAttempts:max,remaining:max?Math.max(0,max-used):null,serverNow:now,openAtMs:open,closeAtMs:close};
+}
+function startAttempt_(d){
+  const attemptId=clean_(d.attemptId,120); if(!attemptId) throw new Error('معرّف المحاولة غير موجود.');
+  const sheet=getAttemptSheet_(), existing=findAttemptRow_(sheet,attemptId);
+  if(existing){const row=sheet.getRange(existing,1,1,ATTEMPT_HEADERS.length).getValues()[0];return {ok:true,attemptId,attemptNo:Number(row[12])||1,existing:true};}
+  const eligibility=checkAttemptEligibility_(d);
+  if(!eligibility.allowed) throw new Error(eligibility.message);
+  const published=getPublishedExamMetaById_(d.examId);
+  const attemptNo=(eligibility.attemptsUsed||0)+1;
+  sheet.appendRow([attemptId,clean_(d.examId,120),clean_(published?published.title:d.exam,160),studentIdentityKey_(d.name,d.sid),clean_(d.name,100),clean_(d.sid,100),'started',new Date(),'','','','',attemptNo,clean_(d.gradingMode,20)||'end',normalizePassScore_(d.passScore),clean_(published?published.subject:d.subject,120)]);
+  SpreadsheetApp.flush();
+  return {ok:true,attemptId,attemptNo};
+}
+function ensureResultMetaHeaders_(sheet){
+  if(!sheet.getRange(1,13).getDisplayValue()) sheet.getRange(1,13).setValue('معرّف المحاولة');
+  if(!sheet.getRange(1,14).getDisplayValue()) sheet.getRange(1,14).setValue('معرّف الاختبار');
+  sheet.getRange(1,13,1,2).setFontWeight('bold').setBackground('#0f172a').setFontColor('#ffffff');
+}
+function updateQuestionAnalytics_(d){
+  const stats=Array.isArray(d.questionStats)?d.questionStats:[]; if(!stats.length)return;
+  const sheet=getQuestionSheet_(), examId=clean_(d.examId,120), exam=clean_(d.exam,160);
+  const last=sheet.getLastRow();
+  const data=last>1?sheet.getRange(2,1,last-1,QUESTION_HEADERS.length).getValues():[];
+  stats.forEach(item=>{
+    const qNo=Math.max(1,Number(item.index)||1);let target=0;
+    for(let i=0;i<data.length;i++)if(String(data[i][0])===examId&&Number(data[i][2])===qNo){target=i+2;break;}
+    const correct=Number(item.correct)?1:0,wrong=Number(item.wrong)?1:0,blank=Number(item.blank)?1:0;
+    if(target){
+      const old=sheet.getRange(target,1,1,QUESTION_HEADERS.length).getValues()[0];
+      const attempts=(Number(old[4])||0)+1,c=(Number(old[5])||0)+correct,w=(Number(old[6])||0)+wrong,b=(Number(old[7])||0)+blank;
+      const accuracy=attempts?Math.round(c/attempts*1000)/10:0;
+      sheet.getRange(target,1,1,QUESTION_HEADERS.length).setValues([[examId,exam,qNo,clean_(item.text,500),attempts,c,w,b,accuracy]]);
+    }else{
+      sheet.appendRow([examId,exam,qNo,clean_(item.text,500),1,correct,wrong,blank,correct*100]);
+    }
+  });
+}
+function submitAttempt_(d){
+  const attemptId=clean_(d.attemptId,120); if(!attemptId) throw new Error('معرّف المحاولة غير موجود.');
+  const attempts=getAttemptSheet_(), attemptRow=findAttemptRow_(attempts,attemptId);
+  if(!attemptRow) throw new Error('لم يتم العثور على محاولة بدأت من خلال النظام. أعد فتح الاختبار وحاول مرة أخرى.');
+  const attempt=attempts.getRange(attemptRow,1,1,ATTEMPT_HEADERS.length).getValues()[0];
+  if(String(attempt[6])==='submitted') return {ok:true,attemptId,alreadySubmitted:true};
+  const sheet=getRes(); ensureResultMetaHeaders_(sheet);
+  const last=sheet.getLastRow();
+  if(last>1){
+    const ids=sheet.getRange(2,13,last-1,1).getDisplayValues().flat();
+    if(ids.includes(attemptId)){
+      attempts.getRange(attemptRow,7,1,9).setValues([['submitted',attempt[7]||new Date(),new Date(),d.score,d.total,d.pct,attempt[12],attempt[13],normalizePassScore_(attempt[14])]]);
+      return {ok:true,attemptId,alreadySubmitted:true};
+    }
+  }
+  const row=[new Date(),d.exam||attempt[2],d.name||attempt[4],d.sid||attempt[5],d.score,d.total,d.pct,d.ok,d.bad,d.blank,d.secs,d.att,attemptId,attempt[1]];
+  sheet.appendRow(row);
+  attempts.getRange(attemptRow,7,1,9).setValues([['submitted',attempt[7]||new Date(),new Date(),d.score,d.total,d.pct,attempt[12],attempt[13],attempt[14]||50]]);
+  updateQuestionAnalytics_(d);
+  SpreadsheetApp.flush();
+  return {ok:true,attemptId};
+}
+function attemptStatus_(attemptId){
+  const sheet=getAttemptSheet_(),row=findAttemptRow_(sheet,attemptId);
+  if(!row)return {ok:true,found:false,status:'missing'};
+  const v=sheet.getRange(row,1,1,ATTEMPT_HEADERS.length).getValues()[0];
+  return {ok:true,found:true,status:String(v[6]),attemptNo:Number(v[12])||1};
+}
+function getAdminAnalytics_(){
+  const attemptsSheet=getAttemptSheet_(),qSheet=getQuestionSheet_();
+  const attempts=attemptsSheet.getLastRow()>1?attemptsSheet.getRange(2,1,attemptsSheet.getLastRow()-1,ATTEMPT_HEADERS.length).getValues().map(r=>({attemptId:r[0],examId:r[1],exam:r[2],identity:r[3],name:r[4],sid:r[5],status:r[6],startedAt:r[7],submittedAt:r[8],score:r[9],total:r[10],pct:r[11],attemptNo:r[12],gradingMode:r[13],passScore:normalizePassScore_(r[14]),subject:String(r[15]||'')})):[];
+  // Backfill legacy submissions for admin analytics only; never add them again if an attempt ID exists.
+  const resultSheet=getRes(),lastResult=resultSheet.getLastRow();
+  if(lastResult>1){
+    const oldRows=resultSheet.getRange(2,1,lastResult-1,14).getValues();
+    oldRows.forEach((r,i)=>{
+      if(String(r[12]||'')||(!r[1]&&!r[2]))return;
+      attempts.push({attemptId:'legacy-'+(i+2),examId:String(r[13]||''),exam:String(r[1]||''),identity:studentIdentityKey_(r[2],r[3]),name:String(r[2]||''),sid:String(r[3]||''),status:'submitted',startedAt:r[0],submittedAt:r[0],score:r[4],total:r[5],pct:r[6],attemptNo:r[11]||1,gradingMode:'legacy',passScore:50,subject:''});
+    });
+  }
+  const questionAnalytics=qSheet.getLastRow()>1?qSheet.getRange(2,1,qSheet.getLastRow()-1,QUESTION_HEADERS.length).getValues().map(r=>({examId:r[0],exam:r[1],index:r[2],text:r[3],attempts:r[4],correct:r[5],wrong:r[6],blank:r[7],accuracy:r[8]})):[];
+  const groups={};attempts.forEach(a=>{const id=String(a.examId||a.exam);if(!groups[id])groups[id]={examId:a.examId,exam:a.exam,subject:a.subject||'',attempts:0,submitted:0,started:0,sumPct:0,pass:0};const g=groups[id];g.attempts++;if(a.status==='submitted'){g.submitted++;g.sumPct+=Number(a.pct)||0;if(Number(a.pct)>=(normalizePassScore_(a.passScore)))g.pass++;}else if(a.status==='started')g.started++;});
+  const comparison=Object.values(groups).map(g=>({examId:g.examId,exam:g.exam,subject:g.subject,attempts:g.attempts,submitted:g.submitted,incomplete:g.started,average:g.submitted?Math.round(g.sumPct/g.submitted*10)/10:0,passRate:g.submitted?Math.round(g.pass/g.submitted*100):0}));
+  const subjectGroups={};
+  attempts.filter(a=>a.status==='submitted' && clean_(a.subject,120)).forEach(a=>{
+    const subject=clean_(a.subject,120),key=String(a.identity||studentIdentityKey_(a.name,a.sid));
+    if(!subjectGroups[subject]) subjectGroups[subject]={};
+    const old=subjectGroups[subject][key];
+    if(!old) subjectGroups[subject][key]={name:a.name,sid:a.sid,bestPct:Number(a.pct)||0,attempts:1};
+    else { old.attempts++; if(Number(a.pct)>old.bestPct) old.bestPct=Number(a.pct)||0; }
+  });
+  const subjectRanking=Object.keys(subjectGroups).sort().map(subject=>({subject,students:Object.values(subjectGroups[subject]).sort((a,b)=>b.bestPct-a.bestPct||a.name.localeCompare(b.name))}));
+  return {attempts,questionAnalytics,comparison,subjectRanking};
+}
+function challengePost_(d){
+  const {rooms,players}=getChallengeSheets_();
+  const action=clean_(d.action,40), code=clean_(d.code,12).toUpperCase();
+
+  if(action==='createRoom'){
+    const policy=getRoomSettings_(false);
+    if(!policy.enabled) throw new Error('تم إيقاف إنشاء غرف التحدي من إدارة المنصة.');
+    if(policy.mode==='admin' && clean_(d.adminKey,120)!==KEY) throw new Error('إنشاء الغرف متاح لمسؤول المنصة فقط.');
+    if(policy.mode==='password' && !roomPasswordMatches_(d.roomPassword,policy.passwordHash)) throw new Error('كلمة مرور إنشاء الغرف غير صحيحة.');
+    if(!/^[A-Z0-9]{6,10}$/.test(code)) throw new Error('كود الغرفة غير صالح.');
+    if(findRoomRow_(rooms,code)) throw new Error('الكود مستخدم بالفعل. أنشئ غرفة جديدة.');
+    const published=getPublishedExamMetaById_(d.examId);
+    if(published&&clean_(d.adminKey,120)!==KEY&&clean_(d.accessCode,12).toUpperCase()!==published.code)throw new Error('كود الاختبار لم يعد صالحًا. افتح بوابة الطالب باستخدام أحدث كود.');
+    const openAtMs=published?published.openAtMs:(Number(d.openAtMs)||0),closeAtMs=published?published.closeAtMs:(Number(d.closeAtMs)||0);
+    if(openAtMs && Date.now()<openAtMs) throw new Error('لم يحن موعد فتح الاختبار بعد.');
+    if(closeAtMs && Date.now()>=closeAtMs) throw new Error('انتهى موعد إغلاق الاختبار.');
+    const mode=d.mode==='teams'?'teams':'duel';
+    const teamSize=mode==='teams'?[2,4,5].includes(Number(d.teamSize))?Number(d.teamSize):2:1;
+    const maxPlayers=mode==='teams'?teamSize*2:2;
+    const hostId=clean_(d.playerId,80), name=clean_(d.name,100), exam=normalizeExam_(d.exam), examId=clean_(d.examId,120);
+    if(!hostId||!name||!exam) throw new Error('بيانات إنشاء الغرفة غير مكتملة.');
+    const now=new Date(), expires=new Date(now.getTime()+6*60*60*1000);
+    rooms.appendRow([code,exam,mode,'waiting',maxPlayers,hostId,now,'',expires,Number(d.total)||0,examId,teamSize,openAtMs,closeAtMs]);
+    players.appendRow([code,hostId,name,'A',now,'joined','','','','','']);
+    SpreadsheetApp.flush();
+    return {ok:true,code,teamSize,maxPlayers};
+  }
+
+  if(action==='joinRoom'){
+    const room=readRoom_({rooms,players},code); if(!room) throw new Error('الغرفة غير موجودة. راجع الكود.');
+    if(room.status!=='waiting') throw new Error('الغرفة بدأت بالفعل أو انتهت.');
+    const incomingExamId=clean_(d.examId,120);
+    if(room.examId ? room.examId!==incomingExamId : normalizeExam_(d.exam)!==normalizeExam_(room.exam)) throw new Error('هذه الغرفة مرتبطة بنسخة امتحان مختلفة. افتح نفس ملف الامتحان الذي أنشأ الغرفة.');
+    if(room.expiresAt && new Date(room.expiresAt).getTime()<Date.now()) throw new Error('انتهت صلاحية الغرفة.');
+    const playerId=clean_(d.playerId,80), name=clean_(d.name,100), team=d.team==='B'?'B':'A';
+    if(!playerId||!name) throw new Error('اكتب اسم اللاعب أولًا.');
+    const existingRow=findPlayerRow_(players,code,playerId);
+    const current=readPlayers_(players,code);
+    if(existingRow){
+      const existing=current.find(p=>p.playerId===playerId);
+      if(existing && existing.status!=='withdrawn') return {ok:true,code};
+    }
+    const active=current.filter(p=>p.status!=='withdrawn' && p.status!=='left');
+    if(active.length>=room.maxPlayers) throw new Error('الغرفة مكتملة.');
+    const teamCap=room.mode==='teams'?room.teamSize:1;
+    let chosen=team;
+    const teamCount=active.filter(p=>p.team===chosen).length;
+    if(teamCount>=teamCap){
+      const other=chosen==='A'?'B':'A';
+      if(active.filter(p=>p.team===other).length<teamCap) chosen=other;
+      else throw new Error('الفريقان مكتملان.');
+    }
+    const newRow=[code,playerId,name,chosen,new Date(),'joined','','','','',''];
+    if(existingRow) players.getRange(existingRow,1,1,PLAYER_HEADERS.length).setValues([newRow]);
+    else players.appendRow(newRow);
+    SpreadsheetApp.flush();
+    return {ok:true,code,team:chosen};
+  }
+
+  if(action==='startRoom'){
+    const room=readRoom_({rooms,players},code); if(!room) throw new Error('الغرفة غير موجودة.');
+    if(room.hostId!==clean_(d.playerId,80)) throw new Error('بدء التحدي متاح لمنشئ الغرفة فقط.');
+    if(room.openAtMs && Date.now()<room.openAtMs) throw new Error('لم يحن موعد فتح الاختبار بعد.');
+    if(room.closeAtMs && Date.now()>=room.closeAtMs) throw new Error('انتهى موعد إغلاق الاختبار.');
+    if(room.status!=='waiting') return {ok:true,code};
+    const current=readPlayers_(players,code).filter(p=>p.status!=='withdrawn' && p.status!=='left');
+    if(current.length!==room.maxPlayers) throw new Error('لا يمكن البدء قبل اكتمال عدد اللاعبين.');
+    const counts={A:current.filter(p=>p.team==='A').length,B:current.filter(p=>p.team==='B').length};
+    const cap=room.mode==='teams'?room.teamSize:1;
+    if(counts.A!==cap||counts.B!==cap) throw new Error('تأكد من اكتمال الفريقين.');
+    rooms.getRange(room.row,4).setValue('countdown');
+    rooms.getRange(room.row,8).setValue(new Date(Date.now()+10000));
+    SpreadsheetApp.flush();
+    return {ok:true,code};
+  }
+
+  if(action==='submitChallenge'){
+    const room=readRoom_({rooms,players},code); if(!room) throw new Error('الغرفة غير موجودة.');
+    if(room.status==='countdown' && room.startedAt && new Date(room.startedAt).getTime()<=Date.now()){
+      rooms.getRange(room.row,4).setValue('active'); room.status='active';
+    }
+    if(room.status!=='active') throw new Error('التحدي لم يبدأ أو انتهى.');
+    const playerId=clean_(d.playerId,80), row=findPlayerRow_(players,code,playerId);
+    if(!row) throw new Error('اللاعب غير مسجل في هذه الغرفة.');
+    const currentStatus=String(players.getRange(row,6).getValue()||'');
+    if(currentStatus==='withdrawn') throw new Error('تم تسجيل انسحابك من التحدي ولا يمكن إرسال نتيجة بعد الانسحاب.');
+    if(currentStatus==='submitted') return {ok:true,code,alreadySubmitted:true};
+    const score=Math.max(0,Number(d.score)||0), total=Math.max(0,Number(d.total)||0);
+    const pct=Math.max(0,Math.min(100,Number(d.pct)||0)), seconds=Math.max(0,Number(d.seconds)||0);
+    players.getRange(row,6,1,6).setValues([['submitted',score,total,pct,seconds,new Date()]]);
+    SpreadsheetApp.flush();
+    return {ok:true,code};
+  }
+
+  if(action==='leaveRoom'){
+    const room=readRoom_({rooms,players},code); if(!room) throw new Error('الغرفة غير موجودة.');
+    const playerId=clean_(d.playerId,80), row=findPlayerRow_(players,code,playerId);
+    if(!row) throw new Error('لم يتم العثور على تسجيلك في هذه الغرفة.');
+    const currentStatus=String(players.getRange(row,6).getValue()||'');
+    if(currentStatus==='submitted') throw new Error('لقد سلّمت التحدي بالفعل، وتم تثبيت نتيجتك.');
+    if(currentStatus==='withdrawn') return {ok:true,code,withdrawn:true};
+    players.getRange(row,6,1,6).setValues([['withdrawn','','','','',new Date()]]);
+
+    // During countdown, cancel the start so the vacant seat can be filled again.
+    const wasWaiting=room.status==='waiting'||room.status==='countdown';
+    if(room.status==='countdown'){
+      rooms.getRange(room.row,4).setValue('waiting');
+      rooms.getRange(room.row,8).clearContent();
+    }
+    // If the host leaves while waiting/countdown, transfer host privileges.
+    if(wasWaiting && room.hostId===playerId){
+      const next=readPlayers_(players,code).find(p=>p.status!=='withdrawn' && p.status!=='left');
+      if(next) rooms.getRange(room.row,6).setValue(next.playerId);
+    }
+    SpreadsheetApp.flush();
+    return {ok:true,code,withdrawn:true};
+  }
+
+  throw new Error('عملية تحدي غير معروفة.');
+}
+function challengeRoom_(code){
+  const sheets=getChallengeSheets_(), room=readRoom_(sheets,code);
+  if(!room) return {ok:false,error:'الغرفة غير موجودة.'};
+  const players=readPlayers_(sheets.players,code);
+  const expired=room.expiresAt && new Date(room.expiresAt).getTime()<Date.now();
+  let status=expired?'expired':room.status;
+  if(status==='countdown' && room.startedAt && new Date(room.startedAt).getTime()<=Date.now()) status='active';
+  const terminal=players.length>0 && players.every(p=>p.status==='submitted'||p.status==='withdrawn'||p.status==='left');
+  if(status==='active' && terminal) status='finished';
+  return {ok:true,room:{code:room.code,exam:room.exam,examId:room.examId,mode:room.mode,teamSize:room.teamSize,hostId:room.hostId,status,maxPlayers:room.maxPlayers,total:room.total,createdAt:room.createdAt,startedAt:room.startedAt},players};
+}
+function doPost(e){
+  const lock=LockService.getScriptLock(); let locked=false;
+  try{
+    lock.waitLock(25000); locked=true;
+    if(!e||!e.postData||!e.postData.contents) throw new Error('بيانات الطلب غير موجودة.');
+    const d=JSON.parse(e.postData.contents);
+    if(d.action==='saveRoomSettings') return json_(writeRoomSettings_(d));
+    if(d.action==='publishExam') return json_(publishExam_(d));
+    if(d.action==='startAttempt') return json_(startAttempt_(d));
+    if(d.action==='submitAttempt') return json_(submitAttempt_(d));
+    if(d.action && ['createRoom','joinRoom','startRoom','submitChallenge','leaveRoom'].includes(String(d.action))){
+      return json_(challengePost_(d));
+    }
+    // Backward compatibility for already-exported V7 student files.
+    if(!d.exam||!d.name) throw new Error('اسم الامتحان أو الطالب غير موجود.');
+    if(d.attemptId) return json_(submitAttempt_(d));
+    const sheet=getRes();
+    sheet.appendRow([new Date(),d.exam,d.name,d.sid||'',d.score,d.total,d.pct,d.ok,d.bad,d.blank,d.secs,d.att]);
+    SpreadsheetApp.flush();
+    return ContentService.createTextOutput('ok');
+  }catch(error){
+    console.error(error.stack||error);
+    return json_({ok:false,error:error.message});
+  }finally{ if(locked) lock.releaseLock(); }
+}
+function doGet(e){
+  const p=e&&e.parameter?e.parameter:{};
+  if(p.page==='portal'){
+    try{
+      const template=HtmlService.createTemplateFromFile('StudentPortal');
+      const hook=ScriptApp.getService().getUrl()||'';
+      template.portalBootstrap=JSON.stringify({hook,code:clean_(p.code,12).toUpperCase().replace(/[^A-Z0-9]/g,''),room:clean_(p.room,12).toUpperCase().replace(/[^A-Z0-9]/g,'')});
+      return template.evaluate().setTitle('بوابة دخول الطلاب — منصة الاختبارات');
+    }catch(error){
+      console.error(error.stack||error);
+      return HtmlService.createHtmlOutput('<meta charset="utf-8"><div dir="rtl" style="font:16px Tahoma;padding:30px"><h2>بوابة الطلاب غير مضافة بعد</h2><p>أضف ملف HTML باسم <b>StudentPortal</b> إلى مشروع Apps Script ثم أعد نشر إصدار جديد.</p></div>');
+    }
+  }
+  if(p.action==='publishedCatalog'){
+    try{return json_(publishedCatalog_());}
+    catch(error){console.error(error.stack||error);return json_({ok:false,error:error.message,items:[]});}
+  }
+  if(p.action==='publishedExam'){
+    try{return json_(getPublishedExamByCode_(p.code));}
+    catch(error){console.error(error.stack||error);return json_({ok:false,error:error.message});}
+  }
+  if(p.action==='publishedExamInfo'){
+    if(p.key!==KEY)return json_({ok:false,error:'غير مصرح بقراءة بيانات النشر.'});
+    try{return json_(publishedExamInfo_(p.examId));}
+    catch(error){return json_({ok:false,error:error.message});}
+  }
+  if(p.action==='room'){
+    try{ return json_(challengeRoom_(clean_(p.code,12).toUpperCase())); }
+    catch(error){ console.error(error.stack||error); return json_({ok:false,error:error.message}); }
+  }
+  if(p.action==='challengeHealth') return json_({ok:true,service:'exam-platform-v10',time:new Date().toISOString()});
+  if(p.action==='roomPolicy'){
+    const policy=getRoomSettings_(false);
+    return json_({ok:true,enabled:policy.enabled,mode:policy.mode});
+  }
+  if(p.action==='roomSettings'){
+    if(p.key!==KEY) return json_({error:'key'});
+    const policy=getRoomSettings_(false);
+    return json_({ok:true,enabled:policy.enabled,mode:policy.mode,passwordSet:!!policy.passwordHash,updatedAt:policy.updatedAt});
+  }
+  if(p.action==='attemptEligibility'){
+    try{return json_(checkAttemptEligibility_({examId:p.examId,exam:p.exam,name:p.name,sid:p.sid,maxAttempts:p.maxAttempts,openAtMs:p.openAtMs,closeAtMs:p.closeAtMs,accessCode:p.accessCode}));}
+    catch(error){return json_({allowed:false,message:error.message});}
+  }
+  if(p.action==='attemptStatus') return json_(attemptStatus_(clean_(p.attemptId,120)));
+  if(p.key!==KEY) return json_({error:'key'});
+  try{
+    const values=getRes().getDataRange().getValues(); values.shift();
+    const rows=values.filter(row=>row[1]!==''||row[2]!=='').map(row=>{const item={};K.forEach((key,index)=>item[key]=row[index]);item.attemptId=row[12]||'';item.examId=row[13]||'';return item;});
+    const analytics=getAdminAnalytics_();
+    return json_({rows,attempts:analytics.attempts,questionAnalytics:analytics.questionAnalytics,comparison:analytics.comparison,subjectRanking:analytics.subjectRanking});
+  }catch(error){ console.error(error.stack||error); return json_({error:error.message}); }
+}
+function testConnection(){
+  const sheet=getRes();
+  Logger.log('Connected to spreadsheet: '+SPREADSHEET_ID);
+  Logger.log('Results tab: '+sheet.getName()+' / last row: '+sheet.getLastRow());
+  return 'الاتصال ناجح: تبويب النتائج جاهز.';
+}
