@@ -358,6 +358,7 @@ body.student-screen #wm{display:none!important}
 .portal-catalog-wrap{margin:20px 0 8px;padding:17px;border:1px solid #e0e8f0;background:#f8fafc;border-radius:16px}.portal-catalog-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.portal-catalog-head b{display:block;color:#2c4560}.portal-catalog-head small{display:block;color:#7b8b9d;margin-top:3px}.portal-live-pill,.portal-exam-tag{border-radius:30px;padding:5px 9px;font-size:.7rem;font-weight:800;background:#eaf5f1;color:#28765b;white-space:nowrap}.portal-catalog-list{display:grid;gap:13px}.portal-subject-group h3{font-size:.88rem;margin:4px 0 8px;color:#46627b}.portal-exam-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px}.portal-exam-item{display:flex;flex-direction:column;gap:8px;padding:13px;border:1px solid #e1e9ef;border-radius:12px;background:#fff}.portal-exam-item b{color:#2e4762;font-size:.9rem}.portal-exam-item>small{color:#7b8999;font-size:.74rem}.portal-exam-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.portal-exam-top small{color:#7b8999;font-size:.68rem}.portal-exam-item button{margin-top:3px;padding:8px 12px;font-size:.82rem}.portal-code-divider{display:flex;align-items:center;gap:10px;margin:18px 0 0;color:#8592a1;font-size:.75rem}.portal-code-divider:before,.portal-code-divider:after{content:'';height:1px;background:#e5ebf1;flex:1}
 @media(max-width:620px){.room-invite-link{flex-direction:column;align-items:stretch}.room-invite-link button{width:100%}.portal-catalog-head{align-items:flex-start}.portal-exam-grid{grid-template-columns:1fr}}
 
+.challenge-exit-actions{justify-content:flex-start;margin:14px 0}.challenge-exit-actions button{min-width:190px}.challenge-exit-actions .g{box-shadow:none}@media(max-width:720px){.challenge-exit-actions{align-items:stretch;flex-direction:column}.challenge-exit-actions button{width:100%;min-width:0}}
 </style>
 </head>
 <body>
@@ -1348,6 +1349,7 @@ function activatePortalExam(examData){
   $('#hd').textContent=exam.title;document.title=exam.title;loadPublicRoomPolicy();student();
   if(st.challenge?.withdrawn){st.withdrawn=true;st.done=true;renderChallengeWithdrawal();startChallengeResultPolling();}
   else if(st.challenge&&!st.started){challengeGet(st.challenge.code).then(data=>{if(data&&data.ok){renderChallengeLobby(data);if(data.room.status==='waiting')startChallengeLobbyPolling();}}).catch(()=>toast('تعذر استعادة غرفة التحدي. استخدم كود الغرفة للانضمام مجددًا.','err'));}
+  else if(!st.challenge&&AUTO_JOIN_ROOM_CODE){const inviteCode=AUTO_JOIN_ROOM_CODE;challengeGet(inviteCode).then(data=>{if(data&&data.ok&&['finished','expired'].includes(String(data.room?.status||'')))renderFinishedChallengeRoom(data);}).catch(()=>{});}
   if(st.started&&!st.done&&exam.time>0&&Date.now()>=st.end)finish(true);flush();if(st.challenge)setTimeout(verifyChallengeReconnect,900);
 }
 function studentPortal(){
@@ -1559,6 +1561,7 @@ async function refreshChallengeLobby(){
 function startChallengeLobbyPolling(){clearInterval(challengePollTimer);challengePollTimer=setInterval(refreshChallengeLobby,3200)}
 function renderChallengeLobby(data){
   if(!data||!data.ok)return;
+  if(data.room&&['finished','expired'].includes(String(data.room.status||''))){renderFinishedChallengeRoom(data);return;}
   const room=data.room,players=data.players||[],teamA=players.filter(p=>p.team==='A'),teamB=players.filter(p=>p.team==='B');
   if(st.challenge)st.challenge.host=String(room.hostId||'')===String(st.challenge.playerId||'');
   const teams=room.mode==='teams',cap=teams?(Number(room.teamSize)||2):1;
@@ -1586,6 +1589,19 @@ function renderChallengeLobby(data){
     challengeStartTimer=setTimeout(()=>startChallengeExam(),delay);
   }
 }
+function renderFinishedChallengeRoom(data){
+  if(!data||!data.ok||!data.room)return;
+  clearInterval(challengePollTimer);clearInterval(challengeResultTimer);clearTimeout(challengeStartTimer);
+  const room=data.room,players=data.players||[];
+  const me=st.challenge?(players.find(p=>String(p.playerId)===String(st.challenge.playerId))||null):null;
+  const headline=room.status==='expired'?'انتهت صلاحية غرفة التحدي':'اكتمل التحدي';
+  const personal=me&&me.status==='submitted'
+    ? `<b>${esc(me.score)} / ${esc(me.total)} (${esc(me.pct)}%)</b>`
+    : me&&(me.status==='withdrawn'||me.status==='left')?'انسحبت من التحدي':'لا توجد نتيجة مسجلة لك في هذه الغرفة';
+  app.innerHTML=`<div class="exam-frame"><section class="result-hero"><div><div class="eyebrow">CHALLENGE COMPLETED</div><h1>${headline}</h1><p>انتهت هذه الجولة. يمكنك مراجعة الترتيب أو الرجوع لاختيار اختبار آخر.</p><p style="margin-top:12px">كود الغرفة: <b class="mono">${esc(room.code||'')}</b></p><p style="margin-top:8px">نتيجتك في التحدي: ${personal}</p></div><div class="result-score-ring"><div><b>${room.status==='expired'?'انتهى':'اكتمل'}</b><small>CHALLENGE</small></div></div></section><div id="challenge-board"></div><div class="result-actions challenge-exit-actions"><button onclick="leaveChallengeToExam()">العودة إلى بيانات الاختبار</button><button class="g" onclick="returnToPortalCatalogue()">العودة إلى قائمة الاختبارات</button></div></div>`;
+  renderChallengeBoard(data);
+}
+
 function getRoomInviteUrl(roomCode){
   const examCode=String(exam._accessCode||'').trim().toUpperCase();
   const hook=String(exam.hook||EXISTING_HOOK||'').split('?')[0];
@@ -1600,7 +1616,36 @@ async function copyRoomInviteLink(){
 }
 function copyChallengeCode(){if(st.challenge?.code){if(navigator.clipboard?.writeText)navigator.clipboard.writeText(st.challenge.code).then(()=>toast('تم نسخ كود الغرفة')).catch(()=>toast('انسخ الكود يدويًا'));else toast('كود الغرفة: '+st.challenge.code)}}
 function leaveChallengeLobby(){withdrawFromChallenge()}
-function exitWithdrawnChallenge(){clearInterval(challengePollTimer);clearInterval(challengeResultTimer);clearTimeout(challengeStartTimer);st.challenge=null;st.withdrawn=false;st.started=false;st.done=false;st.ans=[];st.sent=0;ls.set(ROOM_STATE_KEY,'');window.onbeforeunload=null;student();scrollTo(0,0)}
+function clearChallengeClientState_(){
+  const roomCode=String(st.challenge?.code||AUTO_JOIN_ROOM_CODE||'').trim().toUpperCase();
+  const saved=AK?jget(AK):null;
+  clearInterval(st.tick);clearInterval(challengePollTimer);clearInterval(challengeResultTimer);clearTimeout(challengeStartTimer);clearInterval(resultReleaseTimer);clearInterval(examScheduleTimer);
+  window.onbeforeunload=null;
+  if(saved&&saved.challenge&&String(saved.challenge.code||'').toUpperCase()===roomCode&&AK)ls.remove(AK);
+  if(ROOM_STATE_KEY)ls.remove(ROOM_STATE_KEY);
+  const name=String(st.name||saved?.name||'');
+  const sid=String(st.sid||saved?.sid||'');
+  st={name,sid,ans:[],done:false,started:false,preview:false,reviewMode:false,order:[],perm:[],end:0,t0:0,tick:null,auto:false,att:0,sent:0,attemptId:'',attemptNo:0,challenge:null,currentIndex:0,gradingMode:'end'};
+  AUTO_JOIN_ROOM_CODE='';
+  return roomCode;
+}
+function cleanInviteUrl_(removeExamCode){
+  try{const url=new URL(location.href);url.searchParams.delete('room');if(removeExamCode)url.searchParams.delete('code');history.replaceState(null,'',url.toString());}catch(e){}
+}
+function leaveChallengeToExam(){
+  clearChallengeClientState_();
+  cleanInviteUrl_(false);
+  student();scrollTo(0,0);
+}
+function returnToPortalCatalogue(){
+  clearChallengeClientState_();
+  PORTAL_ACCESS_CODE='';
+  ls.remove('portal-pending-code');ls.remove('portal-last-code');
+  cleanInviteUrl_(true);
+  if(PORTAL_MODE){studentPortal();scrollTo(0,0);}
+  else{currentView='home';returnHome();}
+}
+function exitWithdrawnChallenge(){leaveChallengeToExam()}
 async function withdrawFromChallenge(){
   if(!st.challenge)return;
   if(st.challenge.submitted){toast('لقد سلّمت التحدي بالفعل، وتم تثبيت نتيجتك.');return;}
@@ -1621,7 +1666,7 @@ async function withdrawFromChallenge(){
   ls.set(ROOM_STATE_KEY,JSON.stringify(st.challenge));persist();renderChallengeWithdrawal();startChallengeResultPolling();
 }
 function renderChallengeWithdrawal(){
-  app.innerHTML=`<div class="exam-frame"><section class="result-hero withdrawal-hero"><div><div class="eyebrow">CHALLENGE STATUS</div><h1>تم تسجيل انسحابك من التحدي</h1><p>سيظهر لباقي المشاركين أنك انسحبت. لن تُحتسب لك درجة في ترتيب هذه الجولة.</p><p><b>كود الغرفة: ${esc(st.challenge?.code||'')}</b></p></div><div class="result-score-ring"><div><b>انسحاب</b><small>WITHDRAWN</small></div></div></section><div class="c"><p class="mu">يمكنك متابعة ترتيب الغرفة أدناه، أو العودة إلى صفحة الامتحان الفردي.</p><button class="g" onclick="exitWithdrawnChallenge()">العودة إلى صفحة الامتحان</button></div><div id="challenge-board"></div></div>`;
+  app.innerHTML=`<div class="exam-frame"><section class="result-hero withdrawal-hero"><div><div class="eyebrow">CHALLENGE STATUS</div><h1>تم تسجيل انسحابك من التحدي</h1><p>سيظهر لباقي المشاركين أنك انسحبت. لن تُحتسب لك درجة في ترتيب هذه الجولة.</p><p><b>كود الغرفة: ${esc(st.challenge?.code||'')}</b></p></div><div class="result-score-ring"><div><b>انسحاب</b><small>WITHDRAWN</small></div></div></section><div class="c"><p class="mu">يمكنك متابعة ترتيب الغرفة أدناه، أو العودة إلى صفحة الامتحان الفردي.</p><div class="result-actions challenge-exit-actions"><button onclick="exitWithdrawnChallenge()">العودة إلى بيانات الاختبار</button><button class="g" onclick="returnToPortalCatalogue()">العودة إلى قائمة الاختبارات</button></div></div><div id="challenge-board"></div></div>`;
   pollChallengeResult();
 }
 async function startChallengeRoom(){
@@ -1673,7 +1718,7 @@ async function submitChallengeScore(){
 }
 function renderChallengeBoard(data){
   const host=$('#challenge-board');if(!host||!data?.ok)return;
-  const room=data.room,players=data.players||[],finished=room.status==='finished';
+  const room=data.room,players=data.players||[],finished=['finished','expired'].includes(String(room.status||''));
   if(room.mode==='teams'){
     const teamSize=Number(room.teamSize)||2;
     const teams=['A','B'].map((key)=>{
@@ -1699,7 +1744,7 @@ function renderChallengeBoard(data){
 }
 async function pollChallengeResult(){
   if(!st.challenge)return;
-  try{const data=await challengeGet(st.challenge.code);renderChallengeBoard(data);if(data.room?.status==='finished'){clearInterval(challengeResultTimer)} }catch(e){}
+  try{const data=await challengeGet(st.challenge.code);renderChallengeBoard(data);if(['finished','expired'].includes(String(data.room?.status||''))){clearInterval(challengeResultTimer)} }catch(e){}
 }
 function startChallengeResultPolling(){
   if(!st.challenge)return;
@@ -1937,7 +1982,7 @@ function result(){
   ${answersVisible?`<div class="review-heading"><h2>مراجعة الإجابات</h2><span class="mu">${exam.qs.length} سؤال</span></div>
   ${st.order.map((qi,k)=>{const q=exam.qs[qi],chosen=st.ans[qi],correct=chosen===q.ans;return `<section class="review-card"><div class="review-card-head"><span class="q-num" style="display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#eaf0ff;color:#2857bd">${k+1}</span><span>${q.t==='tf'?'صح أو غلط':'اختيار من متعدد'}</span><span class="review-state ${chosen==null?'blank':correct?'':'bad'}">${chosen==null?'بدون إجابة':correct?'إجابة صحيحة':'إجابة خاطئة'}</span></div><p class="exam-question-text" style="font-size:.98rem;margin-bottom:10px">${esc(q.text)}</p>${q.img?`<img class="exam-question-image" src="${q.img}" alt="صورة السؤال">`:''}${opts(q).map((o,j)=>`<div class="review-answer ${j===q.ans?'correct':chosen===j?'selected-wrong':''}">${j===q.ans?'✓ الإجابة الصحيحة: ':chosen===j?'إجابتك: ':''}${esc(o)}</div>`).join('')}</section>`}).join('')}`:
   `<div class="c"><h3>مراجعة إجاباتك</h3><p class="mu">${esc(answersText)}</p>${st.order.map((qi,k)=>{const q=exam.qs[qi],chosen=st.ans[qi];return `<section class="review-card"><div class="review-card-head"><span class="q-num">${k+1}</span><span>السؤال ${k+1}</span></div><p class="exam-question-text">${esc(q.text)}</p><div class="review-answer selected-wrong">${chosen==null?'لم يتم اختيار إجابة.':'إجابتك: '+esc(opts(q)[chosen])}</div></section>`}).join('')}</div>`}
-  ${st.challenge?'<div id="challenge-board"></div>':''}</div>`;
+  ${st.challenge?'<div id="challenge-board"></div><div class="result-actions challenge-exit-actions"><button onclick="leaveChallengeToExam()">العودة إلى بيانات الاختبار</button><button class="g" onclick="returnToPortalCatalogue()">العودة إلى قائمة الاختبارات</button></div>':''}</div>`;
   if(!st.preview&&!st.reviewMode&&exam.hook)ss(0);if(st.challenge)startChallengeResultPolling();scheduleResultRefresh();
 }
 /* ---------- تشغيل ---------- */
