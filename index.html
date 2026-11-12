@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>منصة الامتحانات</title>
+<style>
+:root{--bg:#f1f5f9;--card:#fff;--tx:#0f172a;--mu:#64748b;--pr:#0f766e;--pr2:#14b8a6;--ink:#0f172a;--ok:#15803d;--no:#b91c1c;--wn:#b45309;--bd:#e2e8f0;--soft:#f8fafc;--sh:0 1px 2px rgba(15,23,42,.06),0 4px 16px rgba(15,23,42,.05)}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1220;--card:#131c2e;--tx:#e6ebf5;--mu:#94a3b8;--pr:#14b8a6;--pr2:#2dd4bf;--bd:#243049;--soft:#0f1726;--sh:none}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.75}
+header.top{background:#0f172a;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:22px 22px;border-bottom:3px solid var(--pr2);color:#fff;padding:20px 16px}
+header.top div{max-width:860px;margin:auto;font-size:1.2em;font-weight:700;letter-spacing:.2px}
+.w{max-width:860px;margin:auto;padding:16px 16px 90px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:18px;margin:14px 0;box-shadow:var(--sh)}
+.c.qe{border-inline-start:4px solid var(--pr)}
+h2,h3{margin:.2em 0 .6em}
+label{display:block;font-size:.86em;color:var(--mu);margin-bottom:4px;font-weight:600}
+input[type=text],input[type=number],textarea{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:8px;background:var(--soft);color:var(--tx);font:inherit;-webkit-user-select:text;user-select:text}
+input:focus,textarea:focus{outline:2px solid var(--pr2);outline-offset:0;background:var(--card)}
+textarea{min-height:76px;resize:vertical}
+input[type=checkbox],input[type=radio]{accent-color:var(--pr);width:18px;height:18px;flex:none}
+button{font:inherit;border:1px solid transparent;border-radius:8px;padding:9px 18px;cursor:pointer;background:var(--pr);color:#fff;font-weight:600;transition:.15s}
+button:hover{filter:brightness(1.12)}button:disabled{opacity:.5;cursor:default}
+button.g{background:var(--card);color:var(--tx);border-color:var(--bd)}button.g:hover{border-color:var(--pr2)}
+button.r{background:var(--card);color:var(--no);border-color:var(--no)}button.k{background:var(--ink);color:#fff}
+button.s{padding:5px 11px;font-size:.88em}
+.row{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}.row>input[type=text]{flex:1;min-width:140px}.sp{flex:1}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.ck{display:flex;gap:10px;align-items:center;color:var(--tx);font-size:1em;margin:10px 0;cursor:pointer;font-weight:400}
+.mu{color:var(--mu);font-size:.9em}
+.badge{display:inline-flex;min-width:30px;height:30px;border-radius:8px;background:var(--ink);color:#fff;align-items:center;justify-content:center;font-size:.88em;flex:none;padding:0 6px}
+.tools{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
+.tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:4px}
+.tb{background:transparent;color:var(--mu);padding:7px 16px}.tb.on{background:var(--ink);color:#fff}
+.q h3{display:flex;gap:10px;align-items:flex-start;font-size:1.05em;font-weight:600}
+.q img{max-width:100%;border-radius:8px;margin:6px 0 10px;border:1px solid var(--bd)}
+.opt{display:flex;gap:12px;align-items:center;padding:11px 14px;border:1.5px solid var(--bd);border-radius:9px;margin:8px 0;cursor:pointer;transition:.12s;background:var(--soft)}
+.opt:hover{border-color:var(--pr2)}
+.opt .l{width:26px;height:26px;border-radius:6px;border:1.5px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:.85em;flex:none;color:var(--mu);background:var(--card)}
+.opt.s{border-color:var(--pr);background:rgba(20,184,166,.12)}.opt.s .l{background:var(--pr);border-color:var(--pr);color:#fff}
+.opt.ok{border-color:var(--ok);background:rgba(21,128,61,.12);cursor:default}.opt.no{border-color:var(--no);background:rgba(185,28,28,.1);cursor:default}
+.bar{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--bd);box-shadow:var(--sh);margin:0 -16px;padding:10px 16px 0}
+.bar .in{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600}
+.nav{display:flex;gap:5px;overflow-x:auto;padding:8px 0}.nb{background:var(--soft);color:var(--mu);border:1px solid var(--bd);padding:2px 0;min-width:30px;font-size:.85em}.nb.d{background:var(--pr);color:#fff;border-color:var(--pr)}
+.tm{font-variant-numeric:tabular-nums;background:var(--ink);color:#fff;padding:2px 14px;border-radius:8px}.tm.warn{background:var(--no);animation:p 1s infinite}
+@keyframes p{50%{opacity:.65}}
+.pg{height:4px;background:var(--bd);margin:0 -16px}.pg i{display:block;height:100%;width:0;background:var(--pr2);transition:width .4s}
+#ts{position:fixed;bottom:22px;left:50%;transform:translate(-50%,30px);opacity:0;background:var(--ink);color:#fff;padding:11px 20px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.3);transition:.3s;z-index:60;pointer-events:none;max-width:92vw;text-align:center;border-inline-start:4px solid var(--pr2)}
+#ts.show{opacity:1;transform:translate(-50%,0)}#ts.fin{border-color:#fbbf24}#ts.err{border-color:#f87171}
+#md{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:70;padding:16px}#md.on{display:flex}
+.mb{background:var(--card);border-radius:12px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.35)}.mb p{margin:0 0 14px}
+.sub{text-align:center;margin:22px 0}.sub button{padding:13px 48px;font-size:1.05em}.sub button.rdy{background:var(--ok);box-shadow:0 0 0 5px rgba(21,128,61,.2)}
+.big{font-size:3em;font-weight:800;text-align:center;color:var(--pr);line-height:1.2}
+.ctr{text-align:center}
+.info,.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin:14px 0}
+.info div,.stats div{background:var(--soft);border:1px solid var(--bd);border-radius:8px;padding:10px;text-align:center;font-size:.9em;color:var(--mu)}.info b,.stats b{display:block;font-size:1.5em;color:var(--pr)}
+.dist{display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;margin:6px 0;font-size:.9em}.dist i{display:block;height:16px;background:var(--pr2);border-radius:4px;min-width:2px}
+.tbl{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.92em}th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:right;white-space:nowrap}th{background:var(--soft);color:var(--mu)}
+details{margin:10px 0}summary{cursor:pointer;font-weight:600;color:var(--pr)}
+pre,textarea.code{direction:ltr;text-align:left;font-family:Consolas,monospace;font-size:.82em;min-height:210px}
+ol{padding-inline-start:22px}
+#wm{position:fixed;inset:-30%;pointer-events:none;z-index:5;opacity:.06;overflow:hidden;font-size:20px;line-height:4;transform:rotate(-20deg);word-break:break-all}
+body.hide .w,body.hide header{visibility:hidden}
+.nosel,.nosel *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.nosel input[type=text]{-webkit-user-select:text;user-select:text}
+@media print{body{display:none!important}}
+</style>
+</head>
+<body>
+<header class="top"><div id="hd">منصة الامتحانات الإلكترونية</div></header>
+<div class="w" id="app"></div>
+<div id="wm"></div><div id="ts"></div><div id="md"></div>
+<script id="d" type="application/json">{"title":"امتحان موارد ","total":"","time":15,"shufQ":true,"shufO":true,"retake":true,"askId":false,"hook":"https://script.google.com/macros/s/AKfycby6nKA98Agnc_AumCqvNEWIYIj7WmhrXJqsvn2VKdw4nsVzpRfabj0WFZW9-qHzCEQK/exec","qs":[{"t":"tf","text":"1. تحليل الوظائف هو عملية جمع وتحليل المعلومات المتعلقة بالمتطلبات التي يجب توافرها في شاغل الوظيفة.","img":"","ans":0},{"t":"tf","text":"2. الاستقطاب هو عملية اختيار الشخص الأنسب للوظيفة من بين مجموعة المتقدمين.","img":"","ans":1},{"t":"tf","text":"3. التطوير عملية موجهة نحو المستقبل وتهدف لإعداد الموظف لشغل وظائف مستقبلية.","img":"","ans":0},{"t":"tf","text":"4. البعد الكمي في تخطيط القوى العاملة يتضمن تحديد التخصصات والمهارات المطلوبة.","img":"","ans":1},{"t":"tf","text":"5. التخطيط قصير الأجل يغطي فترة أقل من سنة.","img":"","ans":0},{"t":"tf","text":"الاستقطاب هو عملية اختيار الشخص الأنسب للوظيفة من بين مجموعة المتقدمين.","img":"","ans":0},{"t":"mcq","text":"6. ما الخطوة الأولى في إجراء تحليل الوظائف؟","img":"","opts":["أ. تحديد الوظائف المراد دراستها","ب. اختيار الموظفين","ج. تقييم الأداء","د. إعداد تقرير تحليل الوظائف"],"ans":0},{"t":"mcq","text":"7. أي وظيفة تهدف إلى الحفاظ على الموظفين ورضاهم والتزامهم وولائهم للمنظمة؟","img":"","opts":["أ. التدريب والتطوير","ب. صيانة العنصر البشري","ج. الاستقطاب","د. تحليل الوظائف"],"ans":0},{"t":"mcq","text":"8. إدارة الوقت والعمل الجماعي من أمثلة:","img":"","opts":["أ. الجدارات الأساسية","ب. الجدارات الوظيفية","ج. الجدارات الإدارية","د. لا شيء مما سبق"],"ans":0},{"t":"mcq","text":"9. أي مرحلة من مراحل التخطيط الاستراتيجي يتم فيها تحويل الاستراتيجية إلى خطط عمل وتخصيص الموارد؟","img":"","opts":["أ. صياغة الاستراتيجية","ب. تطوير الاستراتيجية","ج. تنفيذ الاستراتيجية","د. تقييم الاستراتيجية"],"ans":0}]}</script>
+<script>
+const SRC='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+const DATA=JSON.parse(document.getElementById('d').textContent);
+const $=s=>document.querySelector(s), app=$('#app');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LT=['أ','ب','ج','د','هـ','و','ز','ح'];
+const DEF={title:'امتحان جديد',total:'',time:0,shufQ:false,shufO:false,retake:true,askId:false,hook:'',key:'',qs:[]};
+const mem={};
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return mem[k]||null}},set:(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){mem[k]=v;return false}}};
+const jget=k=>{try{return JSON.parse(ls.get(k))}catch(e){return null}};
+let exam=Object.assign({},DEF,DATA||jget('exam')||{});
+const HOOK='https://script.google.com/macros/s/AKfycby6nKA98Agnc_AumCqvNEWIYIj7WmhrXJqsvn2VKdw4nsVzpRfabj0WFZW9-qHzCEQK/exec';
+if(!exam.hook||exam.hook==='https://script.google.com/macros/s/AKfycbxRji3ym2dOuzOSbEyPwd4sGuGu4843LP3emAgCgSY28u56DrYkNyrGDbeOga9rvJAc/exec')exam.hook=HOOK;
+let st={name:'',sid:'',ans:[],done:false,started:false,preview:false,order:[],perm:[],end:0,t0:0,tick:null,auto:false,att:0,sent:0};
+let tab='q';
+const hash=s=>{let x=5381;for(let i=0;i<s.length;i++)x=(x*33^s.charCodeAt(i))>>>0;return x.toString(36)};
+const AK=DATA?'att:'+hash(JSON.stringify(DATA)):'';
+const total=()=>Number(exam.total)>0?Number(exam.total):exam.qs.length;
+const per=()=>exam.qs.length?Math.round(total()/exam.qs.length*100)/100:0;
+const sh=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const opts=q=>q.t==='tf'?['صح','غلط']:q.opts;
+const fmt=s=>String(s/60|0).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+function save(){if(!ls.set('exam',JSON.stringify(exam)))toast('تعذر الحفظ: المساحة ممتلئة. صدّر نسخة احتياطية أو قلّل الصور.','err')}
+function persist(){if(DATA&&!st.preview)ls.set(AK,JSON.stringify(Object.assign({},st,{tick:0})))}
+function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)}
+let tt;
+function toast(m,type){const t=$('#ts');t.textContent=m;t.className='show '+(type||'');clearTimeout(tt);tt=setTimeout(()=>t.className='',type==='fin'?4200:2400)}
+function dlg(msg,ok,cancel){
+  const m=$('#md');m.innerHTML=`<div class="mb"><p>${msg}</p><div class="row"><button id="mo">${ok||'موافق'}</button>${cancel?'<button class="g" id="mc">إلغاء</button>':''}</div></div>`;m.classList.add('on');
+  return new Promise(r=>{const x=v=>{m.classList.remove('on');r(v)};$('#mo').onclick=()=>x(true);if(cancel)$('#mc').onclick=()=>x(false)});
+}
+
+/* ---------- حماية (نسخة الطلاب فقط) ---------- */
+function protect(){
+  document.body.classList.add('nosel');
+  ['contextmenu','copy','cut','dragstart'].forEach(ev=>document.addEventListener(ev,e=>e.preventDefault()));
+  document.addEventListener('selectstart',e=>{if(e.target.tagName!=='INPUT')e.preventDefault()});
+  const flash=()=>{document.body.classList.add('hide');try{navigator.clipboard.writeText('ممنوع التصوير')}catch(e){}setTimeout(()=>document.body.classList.remove('hide'),1500)};
+  document.addEventListener('keyup',e=>{if(e.key==='PrintScreen')flash()});
+  document.addEventListener('keydown',e=>{
+    const k=e.key.toLowerCase();
+    if(e.key==='PrintScreen'||e.key==='F12'||(e.metaKey&&e.shiftKey)||((e.ctrlKey||e.metaKey)&&['c','x','p','s','u','a'].includes(k))||(e.ctrlKey&&e.shiftKey&&['i','j','c'].includes(k))){e.preventDefault();if(e.key==='PrintScreen')flash()}
+  });
+  window.addEventListener('blur',()=>document.body.classList.add('hide'));
+  window.addEventListener('focus',()=>document.body.classList.remove('hide'));
+  document.addEventListener('visibilitychange',()=>document.body.classList.toggle('hide',document.hidden));
+}
+
+/* ---------- وضع المعلم ---------- */
+function editor(){
+  $('#hd').textContent='لوحة إعداد الامتحان';document.title='لوحة إعداد الامتحان';
+  const T=(k,l)=>`<button class="tb ${tab===k?'on':''}" onclick="tab='${k}';editor()">${l}</button>`;
+  app.innerHTML=`<div class="tools"><div class="tabs">${T('q','الأسئلة ('+exam.qs.length+')')}${T('s','الإعدادات')}${T('r','النتائج')}</div>
+  <div class="row"><button class="g" onclick="preview()">👁 معاينة</button><button class="k" onclick="exportExam()">⬇ تصدير نسخة الطلاب</button></div></div>`
+  +(tab==='q'?tabQ():tab==='s'?tabS():'<div id="rs"></div>');
+  if(tab==='r')loadRes();
+}
+function tabQ(){
+  return `<div class="c row"><b>${exam.qs.length} سؤال</b><span class="mu">— الدرجة الكلية ${total()} — درجة كل سؤال <b id="pq">${per()}</b></span></div>
+  ${exam.qs.length?exam.qs.map(qHtml).join(''):'<div class="c ctr mu">لا توجد أسئلة بعد. ابدأ بإضافة سؤال من الأزرار بالأسفل.</div>'}
+  <div class="row"><button onclick="addQ('mcq')">+ اختيار من متعدد</button><button class="g" onclick="addQ('tf')">+ صح / غلط</button></div>`;
+}
+function qHtml(q,i){
+  return `<div class="c qe"><div class="row"><span class="badge">${i+1}</span><span class="mu">${q.t==='tf'?'صح / غلط':'اختيار من متعدد'}</span><span class="sp"></span>
+  <button class="g s" onclick="mvQ(${i},-1)" ${i?'':'disabled'}>↑</button><button class="g s" onclick="mvQ(${i},1)" ${i<exam.qs.length-1?'':'disabled'}>↓</button><button class="g s" onclick="dupQ(${i})">نسخ</button><button class="r s" onclick="delQ(${i})">حذف</button></div>
+  <textarea placeholder="اكتب نص السؤال..." oninput="exam.qs[${i}].text=this.value;save()">${esc(q.text)}</textarea>
+  <div class="row"><input type="file" accept="image/*" onchange="setImg(${i},this.files[0])">${q.img?`<button class="g s" onclick="exam.qs[${i}].img='';save();editor()">إزالة الصورة</button>`:''}</div>
+  ${q.img?`<img src="${q.img}" style="max-width:260px;border-radius:8px">`:''}
+  <label>حدد الإجابة الصحيحة بالدائرة:</label>
+  ${opts(q).map((x,j)=>`<div class="row"><input type="radio" name="a${i}" ${q.ans===j?'checked':''} onchange="exam.qs[${i}].ans=${j};save()">
+  ${q.t==='tf'?`<b>${x}</b>`:`<input type="text" value="${esc(x)}" placeholder="الاختيار ${LT[j]}" oninput="exam.qs[${i}].opts[${j}]=this.value;save()"><button class="g s" onclick="delOpt(${i},${j})">✕</button>`}</div>`).join('')}
+  ${q.t==='mcq'&&q.opts.length<8?`<button class="g s" onclick="exam.qs[${i}].opts.push('');save();editor()">+ اختيار</button>`:''}</div>`;
+}
+function addQ(t){exam.qs.push(t==='tf'?{t,text:'',img:'',ans:0}:{t,text:'',img:'',opts:['','','',''],ans:0});save();editor();scrollTo(0,document.body.scrollHeight)}
+async function delQ(i){if(await dlg('هل تريد حذف السؤال '+(i+1)+'؟','حذف',1)){exam.qs.splice(i,1);save();editor()}}
+function mvQ(i,d){const j=i+d;if(j<0||j>=exam.qs.length)return;[exam.qs[i],exam.qs[j]]=[exam.qs[j],exam.qs[i]];save();editor()}
+function dupQ(i){exam.qs.splice(i+1,0,JSON.parse(JSON.stringify(exam.qs[i])));save();editor()}
+async function delOpt(i,j){const q=exam.qs[i];if(q.opts.length<=2)return dlg('يلزم اختياران على الأقل.');q.opts.splice(j,1);if(q.ans>=q.opts.length)q.ans=0;else if(q.ans>j)q.ans--;save();editor()}
+function setImg(i,f){
+  if(!f)return;const r=new FileReader();
+  r.onload=()=>{const im=new Image();im.onload=()=>{const s=Math.min(1,800/im.width),c=document.createElement('canvas');c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);exam.qs[i].img=c.toDataURL('image/jpeg',.75);save();editor()};im.onerror=()=>dlg('تعذر قراءة الصورة.');im.src=r.result};
+  r.readAsDataURL(f);
+}
+const GS=`const KEY='CHANGE_ME'; // غيّرها لكلمة سر خاصة بك (حروف وأرقام إنجليزية)
+function doPost(e){
+  const d=JSON.parse(e.postData.contents);
+  const s=SpreadsheetApp.getActiveSheet();
+  if(s.getLastRow()===0)s.appendRow(['t','exam','name','sid','score','total','pct','ok','bad','blank','secs','att']);
+  s.appendRow([new Date(),d.exam,d.name,d.sid,d.score,d.total,d.pct,d.ok,d.bad,d.blank,d.secs,d.att]);
+  return ContentService.createTextOutput('ok');
+}
+function doGet(e){
+  const out=o=>ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+  if(!e.parameter.key||e.parameter.key!==KEY)return out({error:'key'});
+  const v=SpreadsheetApp.getActiveSheet().getDataRange().getValues();
+  const h=v.shift();
+  return out({rows:v.map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o})});
+}`;
+function tabS(){
+  return `<div class="c"><h3>الإعدادات العامة</h3><div class="grid">
+   <div><label>عنوان الامتحان</label><input type="text" value="${esc(exam.title)}" oninput="exam.title=this.value;save()"></div>
+   <div><label>الدرجة الكلية (فارغ = عدد الأسئلة)</label><input type="number" min="1" value="${esc(exam.total)}" oninput="exam.total=this.value;save()"></div>
+   <div><label>مدة الامتحان بالدقائق (0 = بدون وقت)</label><input type="number" min="0" value="${exam.time}" oninput="exam.time=Math.max(0,+this.value||0);save()"></div></div>
+  <label class="ck"><input type="checkbox" ${exam.shufQ?'checked':''} onchange="exam.shufQ=this.checked;save()"> ترتيب عشوائي للأسئلة (يتغير مع كل محاولة)</label>
+  <label class="ck"><input type="checkbox" ${exam.shufO?'checked':''} onchange="exam.shufO=this.checked;save()"> ترتيب عشوائي للاختيارات</label>
+  <label class="ck"><input type="checkbox" ${exam.retake?'checked':''} onchange="exam.retake=this.checked;save()"> السماح بإعادة الامتحان بعد التسليم</label>
+  <label class="ck"><input type="checkbox" ${exam.askId?'checked':''} onchange="exam.askId=this.checked;save()"> طلب الرقم الجامعي من الطالب</label></div>
+  <div class="c"><h3>حفظ نتائج الطلاب (مجاني عبر Google Sheets)</h3>
+  <div class="grid"><div><label>رابط الاستقبال (ينتهي بـ /exec)</label><input type="text" dir="ltr" value="${esc(exam.hook)}" oninput="exam.hook=this.value.trim();save()"></div>
+  <div><label>كلمة سر النتائج (لك فقط، لا تُرسل للطلاب)</label><input type="text" dir="ltr" value="${esc(exam.key)}" oninput="exam.key=this.value.trim();save()"></div></div>
+  <details><summary>خطوات الربط (دقيقتان)</summary><ol>
+  <li>افتح <b>Google Sheets</b> وأنشئ جدولًا جديدًا، ثم من القائمة: Extensions ← Apps Script.</li>
+  <li>امسح الكود الموجود والصق الكود التالي، وغيّر <b>CHANGE_ME</b> لكلمة سر، ثم احفظ.</li>
+  <li>اضغط Deploy ← New deployment ← النوع Web app ← Execute as: <b>Me</b> ← Who has access: <b>Anyone</b> ← Deploy ووافق على الصلاحيات.</li>
+  <li>انسخ رابط Web app والصقه هنا، واكتب نفس كلمة السر في الخانة المجاورة.</li>
+  <li>أعد تصدير نسخة الطلاب بعد الربط. وإذا عدّلت الكود لاحقًا اعمل New deployment جديد.</li></ol>
+  <textarea class="code" id="gs" readonly onclick="this.select()">${esc(GS)}</textarea><button class="g s" onclick="cpGS()">نسخ الكود</button></details></div>
+  <div class="c"><h3>نسخة احتياطية</h3><p class="mu">الأسئلة محفوظة في متصفحك فقط. احتفظ بنسخة احتياطية لتجنب فقدانها.</p>
+  <div class="row"><button class="g" onclick="dl('exam-backup.json',JSON.stringify(exam),'application/json')">حفظ نسخة احتياطية</button>
+  <label class="g" style="display:inline-block;border:1px solid var(--bd);border-radius:8px;padding:8px 14px;margin:0;cursor:pointer;color:var(--tx)">استرجاع من ملف<input type="file" accept=".json" hidden onchange="imp(this.files[0])"></label></div></div>`;
+}
+function cpGS(){const t=$('#gs');t.select();try{document.execCommand('copy');toast('تم نسخ الكود')}catch(e){toast('حدد النص وانسخه يدويًا','err')}}
+function imp(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(!Array.isArray(o.qs))throw 0;exam=Object.assign({},DEF,o);save();tab='q';editor();toast('تم استرجاع الامتحان')}catch(e){dlg('الملف غير صالح.')}};r.readAsText(f)}
+function check(){
+  if(!exam.qs.length){dlg('أضف سؤالًا واحدًا على الأقل.');return false}
+  const bad=exam.qs.findIndex(q=>!q.text.trim()&&!q.img);if(bad>=0){dlg('السؤال '+(bad+1)+' فارغ.');return false}
+  const bo=exam.qs.findIndex(q=>q.t==='mcq'&&q.opts.some(x=>!x.trim()));if(bo>=0){dlg('السؤال '+(bo+1)+' به اختيار فارغ.');return false}
+  return true;
+}
+function preview(){if(!check())return;clearInterval(st.tick);st=Object.assign(st,{name:'معاينة',sid:'',ans:[],done:false,started:false,preview:true,att:0,sent:0});student()}
+async function exportExam(){
+  if(!check())return;
+  if(!exam.hook&&!await dlg('لم تربط الموقع بجدول النتائج، لذلك لن تُحفظ نتائج الطلاب. هل تريد التصدير؟','تصدير',1))return;
+  const pub=Object.assign({},exam);delete pub.key;
+  const j=JSON.stringify(pub).replace(/</g,'\\u003c');
+  dl('exam-students.html',SRC.replace(/(<script id="d" type="application\/json">)[\s\S]*?(<\/script>)/,(m,a,b)=>a+j+b),'text/html');
+  toast('تم تصدير نسخة الطلاب');
+}
+
+/* ---------- النتائج (للمعلم) ---------- */
+async function loadRes(){
+  const box=$('#rs');
+  if(!exam.hook||!exam.key){box.innerHTML='<div class="c">لعرض النتائج اربط الموقع بجدول Google Sheets وأدخل كلمة السر من تبويب «الإعدادات».</div>';return}
+  box.innerHTML='<div class="c">جارٍ تحميل النتائج…</div>';
+  try{const r=await fetch(exam.hook+(exam.hook.includes('?')?'&':'?')+'key='+encodeURIComponent(exam.key)+'&t='+Date.now());const j=await r.json();if(j.error)throw 0;showRes(j.rows||[])}
+  catch(e){box.innerHTML='<div class="c">تعذر تحميل النتائج. تأكد من الرابط وكلمة السر ومن أن خيار الوصول Anyone. <br><br><button onclick="loadRes()">إعادة المحاولة</button></div>'}
+}
+function showRes(rows){
+  const g={};rows.filter(r=>r.exam===exam.title).forEach(r=>{const k=String(r.sid||r.name).trim().toLowerCase();const x=g[k];if(!x){g[k]=Object.assign({},r,{n:1})}else{const n=x.n+1;if(Number(r.pct)>Number(x.pct))g[k]=Object.assign({},r);g[k].n=n}});
+  const L=Object.values(g).sort((a,b)=>b.pct-a.pct),N=L.length;
+  if(!N){$('#rs').innerHTML='<div class="c ctr mu">لا توجد نتائج لهذا الامتحان بعد. (يُطابَق عنوان الامتحان، فلا تغيّره بعد النشر)<br><br><button class="g" onclick="loadRes()">تحديث</button></div>';return}
+  const p=L.map(x=>Number(x.pct)),avg=Math.round(p.reduce((a,b)=>a+b,0)/N),pass=Math.round(p.filter(v=>v>=50).length/N*100);
+  const B=[['90% – 100%',90,101],['80% – 89%',80,90],['65% – 79%',65,80],['50% – 64%',50,65],['أقل من 50%',0,50]];
+  $('#rs').innerHTML=`<div class="c"><div class="row"><h3 style="margin:0">ملخص النتائج</h3><span class="sp"></span><button class="g s" onclick="loadRes()">تحديث</button><button class="g s" onclick="csv()">تصدير CSV</button></div>
+  <div class="stats"><div><b>${N}</b>عدد الطلاب</div><div><b>${avg}%</b>المتوسط</div><div><b>${Math.max(...p)}%</b>الأعلى</div><div><b>${Math.min(...p)}%</b>الأقل</div><div><b>${pass}%</b>نسبة النجاح</div></div>
+  <h3>توزيع الدرجات</h3>${B.map(b=>{const c=p.filter(v=>v>=b[1]&&v<b[2]).length;return `<div class="dist"><span>${b[0]}</span><i style="width:${c/N*100}%"></i><b>${c}</b></div>`}).join('')}
+  <p class="mu">تُحتسب أفضل محاولة لكل طالب.</p></div>
+  <div class="c tbl"><table><tr><th>#</th><th>الاسم</th><th>الرقم الجامعي</th><th>الدرجة</th><th>النسبة</th><th>المحاولات</th><th>الزمن</th><th>التاريخ</th></tr>
+  ${L.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name)}</td><td>${esc(x.sid)}</td><td>${esc(x.score)} / ${esc(x.total)}</td><td>${esc(x.pct)}%</td><td>${x.n}</td><td>${fmt(+x.secs||0)}</td><td>${new Date(x.t).toLocaleString('ar-EG')}</td></tr>`).join('')}</table></div>`;
+  window._L=L;
+}
+function csv(){
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const r=[['الاسم','الرقم الجامعي','الدرجة','من','النسبة','المحاولات','الزمن (ثانية)','التاريخ']].concat(window._L.map(x=>[x.name,x.sid,x.score,x.total,x.pct,x.n,x.secs,x.t]));
+  dl('results.csv','\ufeff'+r.map(a=>a.map(q).join(',')).join('\n'),'text/csv');
+}
+
+/* ---------- وضع الطالب ---------- */
+function backEdit(){clearInterval(st.tick);window.onbeforeunload=null;st.preview=false;st.started=false;editor()}
+function student(){
+  if(DATA&&!protect.done){protect();protect.done=1}
+  $('#hd').textContent=exam.title;document.title=exam.title;
+  if(!st.started){
+    app.innerHTML=`<div class="c"><h2>${esc(exam.title)}</h2>
+    <div class="info"><div><b>${exam.qs.length}</b>عدد الأسئلة</div><div><b>${total()}</b>الدرجة الكلية</div><div><b>${exam.time>0?exam.time+' د':'مفتوح'}</b>مدة الامتحان</div></div>
+    <p class="mu">${exam.time>0?'يبدأ العد التنازلي فور الضغط على «ابدأ»، ويُسلَّم الامتحان تلقائيًا عند انتهاء الوقت. ':''}لا يمكن نسخ المحتوى أو تصويره، ويظهر اسمك كعلامة مائية على الصفحة.</p>
+    <div class="grid"><div><label>الاسم الكامل</label><input type="text" id="nm" value="${esc(st.name)}"></div>${exam.askId?`<div><label>الرقم الجامعي</label><input type="text" id="sid" value="${esc(st.sid)}"></div>`:''}</div><br>
+    <button onclick="startX()">ابدأ الامتحان</button>${st.preview?' <button class="g" onclick="backEdit()">رجوع للتعديل</button>':''}</div>`;return;
+  }
+  if(st.done)return result();
+  app.innerHTML=`<div class="bar"><div class="in"><span id="cnt"></span>${exam.time>0?'<span class="tm" id="tm"></span>':''}</div>
+  <div class="nav">${st.order.map((qi,k)=>`<button class="nb" id="n${qi}" onclick="go(${qi})">${k+1}</button>`).join('')}</div><div class="pg"><i id="pgi"></i></div></div>`+
+  st.order.map((qi,k)=>{const q=exam.qs[qi];
+    return `<div class="c q" id="q${qi}"><h3><span class="badge">${k+1}</span><span>${esc(q.text)}</span></h3>${q.img?`<img src="${q.img}" draggable="false">`:''}
+    ${st.perm[qi].map((j,p)=>`<div class="opt ${st.ans[qi]===j?'s':''}" data-j="${j}" onclick="pick(${qi},${j})"><span class="l">${LT[p]}</span><span>${esc(opts(q)[j])}</span></div>`).join('')}</div>`}).join('')
+  +`<div class="sub"><button id="sb" onclick="submitX()">تسليم الامتحان</button></div>`;
+  upd();if(exam.time>0)tickF();
+}
+function go(qi){const e=$('#q'+qi);if(e)scrollTo({top:e.getBoundingClientRect().top+scrollY-120,behavior:'smooth'})}
+function startX(){
+  const v=$('#nm').value.trim(),s=exam.askId?$('#sid').value.trim():'';
+  if(!v)return dlg('اكتب اسمك أولًا.');if(exam.askId&&!s)return dlg('اكتب الرقم الجامعي أولًا.');
+  st.name=v;st.sid=s;wm();begin();student();scrollTo(0,0);
+}
+function wm(){$('#wm').textContent=((st.name||'')+' '+(st.sid||'')+'   ').repeat(500)}
+function begin(){
+  st.order=exam.qs.map((_,i)=>i);if(exam.shufQ)st.order=sh(st.order);
+  st.perm=exam.qs.map(q=>{const p=[...Array(opts(q).length).keys()];return exam.shufO&&q.t==='mcq'?sh(p):p});
+  st.ans=[];st.done=false;st.started=true;st.auto=false;st.sent=0;st.att++;st.t0=Date.now();
+  clearInterval(st.tick);
+  if(exam.time>0){st.end=Date.now()+exam.time*60000;st.tick=setInterval(tickF,500)}
+  if(!st.preview)window.onbeforeunload=e=>{e.preventDefault();e.returnValue=''};
+  persist();
+}
+function tickF(){
+  const s=Math.max(0,Math.ceil((st.end-Date.now())/1000)),el=$('#tm');
+  if(el){el.textContent=fmt(s);el.classList.toggle('warn',s<=60)}
+  if(s<=0&&!st.done)finish(true);
+}
+const answered=()=>exam.qs.filter((q,i)=>st.ans[i]!=null).length;
+function upd(){
+  const n=answered(),N=exam.qs.length;
+  $('#cnt').textContent=`تمت الإجابة على ${n} من ${N}`;$('#pgi').style.width=(n/N*100)+'%';$('#sb').classList.toggle('rdy',n===N);
+  exam.qs.forEach((q,i)=>{const b=$('#n'+i);if(b)b.classList.toggle('d',st.ans[i]!=null)});
+}
+function pick(qi,j){
+  if(st.done)return;const first=st.ans[qi]==null;st.ans[qi]=j;
+  document.querySelectorAll('#q'+qi+' .opt').forEach(o=>o.classList.toggle('s',+o.dataset.j===j));
+  persist();upd();if(first)cheer();
+}
+function cheer(){
+  const n=answered(),N=exam.qs.length;
+  if(n===N)return toast('ممتاز، أنهيت جميع الأسئلة. راجع إجاباتك ثم اضغط «تسليم الامتحان».','fin');
+  if(N-n<=Math.max(1,Math.ceil(N*.2)))return toast('أحسنت، اقتربت من الانتهاء');
+  if(n===1)return toast('بداية موفقة');
+  toast(['أحسنت، واصل','أداء جيد، استمر','عمل متقن، أكمل','إجابة مسجلة، تابع'][n%4]);
+}
+async function submitX(){
+  const left=exam.qs.length-answered();
+  if(!await dlg(left?`هناك ${left} سؤال بدون إجابة. هل تريد التسليم؟`:'هل أنت متأكد من تسليم الامتحان؟','تسليم',1))return;
+  if(!st.done)finish(false);
+}
+function calc(){let ok=0;exam.qs.forEach((q,i)=>{if(st.ans[i]===q.ans)ok++});const a=answered(),N=exam.qs.length;
+  return{ok,bad:a-ok,blank:N-a,sc:Math.round(ok*per()*100)/100,pc:Math.round(ok/N*100)}}
+function finish(auto){
+  clearInterval(st.tick);window.onbeforeunload=null;st.done=true;st.auto=auto;
+  if(!st.preview&&exam.hook&&!st.sent){
+    st.sent=1;const c=calc(),q=jget('q')||[];
+    q.push({exam:exam.title,name:st.name,sid:st.sid,score:c.sc,total:total(),pct:c.pc,ok:c.ok,bad:c.bad,blank:c.blank,secs:Math.round((Date.now()-st.t0)/1000),att:st.att});
+    ls.set('q',JSON.stringify(q));
+  }
+  persist();student();scrollTo(0,0);flush();
+}
+let flushing=0;
+async function flush(){
+  if(flushing||!exam.hook)return;const q=jget('q')||[];if(!q.length){if(st.done&&st.sent)ss(1);return}flushing=1;const keep=[];
+  for(const p of q){try{await fetch(exam.hook,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(p)})}catch(e){keep.push(p)}}
+  ls.set('q',JSON.stringify(keep));flushing=0;ss(keep.length?2:1);
+}
+function ss(v){const e=$('#ss');if(e)e.textContent=v===1?'✓ تم إرسال نتيجتك وحفظها.':v===2?'تعذر إرسال النتيجة الآن (لا يوجد اتصال). ستُرسل تلقائيًا عند عودة الاتصال.':'جارٍ إرسال النتيجة…'}
+addEventListener('online',flush);
+function retry(){begin();student();scrollTo(0,0)}
+function result(){
+  const c=calc(),g=c.pc>=90?'ممتاز':c.pc>=80?'جيد جدًا':c.pc>=65?'جيد':c.pc>=50?'مقبول':'يحتاج إلى مراجعة';
+  app.innerHTML=`<div class="c ctr"><h2>نتيجة الامتحان — ${esc(st.name)}</h2>
+  ${st.auto?'<p class="mu">انتهى الوقت وتم تسليم الامتحان تلقائيًا.</p>':''}
+  <div class="big">${c.sc} / ${total()}</div><p><b>${c.pc}%</b> — التقدير: <b>${g}</b></p>
+  <p class="mu">صحيحة: ${c.ok} — خاطئة: ${c.bad} — بدون إجابة: ${c.blank}</p>
+  ${!st.preview&&exam.hook?'<p class="mu" id="ss"></p>':''}
+  ${exam.retake||st.preview?'<button onclick="retry()">إعادة الامتحان</button> ':''}${st.preview?'<button class="g" onclick="backEdit()">رجوع للتعديل</button>':''}</div>`
+  +st.order.map((qi,k)=>{const q=exam.qs[qi];
+    return `<div class="c q"><h3><span class="badge">${k+1}</span><span>${esc(q.text)}</span></h3>${q.img?`<img src="${q.img}" draggable="false">`:''}
+    ${st.perm[qi].map((j,p)=>`<div class="opt ${j===q.ans?'ok':st.ans[qi]===j?'no':''}"><span class="l">${LT[p]}</span><span>${j===q.ans?'✔ ':st.ans[qi]===j?'✘ ':''}${esc(opts(q)[j])}</span></div>`).join('')}
+    ${st.ans[qi]==null?'<div class="mu">لم تُجب على هذا السؤال</div>':''}</div>`}).join('');
+  if(!st.preview&&exam.hook)ss(0);
+}
+
+/* ---------- تشغيل ---------- */
+if(DATA){
+  const s=jget(AK);
+  if(s&&s.started){
+    st=Object.assign(st,s,{tick:null});wm();
+    if(!st.done){
+      if(exam.time>0){if(Date.now()>=st.end)st.auto=true;else st.tick=setInterval(tickF,500)}
+      window.onbeforeunload=e=>{e.preventDefault();e.returnValue=''};
+    }
+  }
+  student();
+  if(st.started&&!st.done&&exam.time>0&&Date.now()>=st.end)finish(true);
+  flush();
+}else editor();
+</script></body></html>
