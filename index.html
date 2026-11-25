@@ -373,7 +373,7 @@ const PORTAL_BOOTSTRAP=window.PORTAL_BOOTSTRAP||{};
 let DATA=JSON.parse(document.getElementById('d').textContent);
 let PORTAL_ACCESS_CODE='';
 let AUTO_JOIN_ROOM_CODE='';
-if(PORTAL_MODE&&!DATA){try{const params=new URLSearchParams(location.search);PORTAL_ACCESS_CODE=String(PORTAL_BOOTSTRAP.code||params.get('code')||'').trim().toUpperCase()||String(localStorage.getItem('portal-pending-code')||localStorage.getItem('portal-last-code')||'').trim().toUpperCase();AUTO_JOIN_ROOM_CODE=String(PORTAL_BOOTSTRAP.room||params.get('room')||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');}catch(e){PORTAL_ACCESS_CODE='';AUTO_JOIN_ROOM_CODE='';}}
+if(PORTAL_MODE&&!DATA){try{const params=new URLSearchParams(location.search);PORTAL_ACCESS_CODE=String(PORTAL_BOOTSTRAP.code||params.get('code')||'').trim().toUpperCase();AUTO_JOIN_ROOM_CODE=String(PORTAL_BOOTSTRAP.room||params.get('room')||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');}catch(e){PORTAL_ACCESS_CODE='';AUTO_JOIN_ROOM_CODE='';}}
 const $=s=>document.querySelector(s), app=$('#app');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const LT=['أ','ب','ج','د','هـ','و','ز','ح'];
@@ -1355,7 +1355,7 @@ function activatePortalExam(examData){
 function studentPortal(){
   document.body.classList.add('student-screen');$('#hd').textContent='بوابة دخول الطلاب';document.title='بوابة دخول الطلاب — منصة الاختبارات';
   renderPortalGate(null,'');
-  if(PORTAL_ACCESS_CODE){const f=$('#portal-code');if(f)f.value=PORTAL_ACCESS_CODE;enterPublishedExam(true);}
+  if(/^[A-Z0-9]{6,10}$/.test(PORTAL_ACCESS_CODE)){const f=$('#portal-code');if(f)f.value=PORTAL_ACCESS_CODE;enterPublishedExam(true);}
 }
 async function refreshPortalExam(){
   if(!PORTAL_MODE||!DATA||!exam._accessCode)return;
